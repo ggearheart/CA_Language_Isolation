@@ -39,8 +39,8 @@ prototype using the latest available data.
 | Layer | Source | Level |
 |-------|--------|-------|
 | Linguistic isolation (`ling`, `lingP`) + tract geometry | [CalEnviroScreen 5.0 (draft), OEHHA](https://data.ca.gov/dataset/draft-calenviroscreen-5-0) | Census tract |
-| Limited-English households by broad group | U.S. Census **ACS 2019–2023 5-year**, table **C16002** | Census tract |
-| Languages isolated for (named) | U.S. Census **ACS 2019–2023 5-year**, table **C16001** | Census tract |
+| Limited-English households by broad group | U.S. Census **ACS 2020–2024 5-year**, table **C16002** | Census tract |
+| Languages isolated for (named) | U.S. Census **ACS 2020–2024 5-year**, table **C16001** | Census tract |
 | ZIP + city (per tract) | CalEnviroScreen 5.0 CSV (`ZIP`, `apx_loc`) | Census tract |
 | Regional Water Board | [State Water Board boundaries](https://gis.data.ca.gov/maps/5692f02f7c9a47e384522dfb496f522a) — tract centroid → region (point-in-polygon) | Census tract |
 

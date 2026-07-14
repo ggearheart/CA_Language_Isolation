@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pull ACS 2023 5-year language data for all California census tracts and
+"""Pull ACS 2020-2024 5-year language data for all California census tracts and
 write a per-tract JSON keyed by 11-digit GEOID.
 
 Two tables:
@@ -18,7 +18,7 @@ Output: data/acs_lang.json
 """
 import json, os, sys, urllib.request, urllib.parse
 
-YEAR = "2023"
+YEAR = "2024"
 BASE = f"https://api.census.gov/data/{YEAR}/acs/acs5"
 KEY = os.environ.get("CENSUS_KEY")
 OUT = os.path.join(os.path.dirname(__file__), "..", "data", "acs_lang.json")
