@@ -66,6 +66,12 @@ select.filter{cursor:pointer;}
   padding:6px 8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;}
 .search-hint.on{display:block;}
 .search-hint b{color:var(--text);}
+.dl-btn{width:100%;padding:8px;border:1px solid var(--ca-blue);border-radius:var(--radius);
+  background:#fff;color:var(--ca-blue);cursor:pointer;font-size:.8rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:6px;margin:0 0 12px;}
+.dl-btn:hover{background:var(--ca-blue);color:#fff;}
+.dl-btn:disabled{opacity:.45;cursor:default;background:#fff;color:var(--ca-blue);}
+.dl-btn .dl-count{font-weight:500;opacity:.85;font-size:.73rem;}
 .stats-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:4px 0 11px;}
 .stat-card{background:var(--bg);border-radius:6px;padding:8px 5px;text-align:center;border:1px solid var(--border);}
 .stat-num{font-size:1.12rem;font-weight:800;color:var(--ca-blue);line-height:1;}
@@ -160,6 +166,8 @@ select.filter{cursor:pointer;}
         <div class="stat-card"><div class="stat-num" id="st_high">—</div><div class="stat-lbl" id="stl_high">High-isolation tracts</div></div>
       </div>
 
+      <button class="dl-btn" id="dlcsv">⬇ <span id="h_dlcsv">Download CSV</span><span class="dl-count" id="dlcount"></span></button>
+
       <div class="sb-label" id="h_legend">Legend</div>
       <div class="legend" id="legend"></div>
 
@@ -199,7 +207,7 @@ const T={
   en:{h_title:'California Language Isolation Map',
       h_sub:'Linguistic isolation & languages spoken · CalEnviroScreen 5.0 + ACS',
       h_intro:"Explore linguistic isolation across California's census tracts and see which languages households are isolated in. Choose a metric, then click any tract for detail.",
-      h_metric:'Map metric',h_county:'County',h_find:'Find a place',h_legend:'Legend',h_menu:'Menu',h_nearme:'Near me',
+      h_metric:'Map metric',h_county:'County',h_find:'Find a place',h_legend:'Legend',h_menu:'Menu',h_nearme:'Near me',h_dlcsv:'Download CSV',
       m_lp:'Isolation<br>percentile',m_lg:'% isolated<br>households',m_grp:'Dominant<br>language',
       stl_tracts:'Tracts shown',stl_lep:'Isolated households',stl_high:'High-isolation tracts',
       hint:'👆 Click a tract on the map to see its linguistic isolation score and language breakdown.',
@@ -222,7 +230,7 @@ const T={
   es:{h_title:'Mapa de Aislamiento Lingüístico de California',
       h_sub:'Aislamiento lingüístico e idiomas hablados · CalEnviroScreen 5.0 + ACS',
       h_intro:'Explore el aislamiento lingüístico en los distritos censales de California y vea en qué idiomas están aislados los hogares. Elija una métrica y haga clic en un distrito para ver detalles.',
-      h_metric:'Métrica del mapa',h_county:'Condado',h_find:'Buscar un lugar',h_legend:'Leyenda',h_menu:'Menú',h_nearme:'Cerca de mí',
+      h_metric:'Métrica del mapa',h_county:'Condado',h_find:'Buscar un lugar',h_legend:'Leyenda',h_menu:'Menú',h_nearme:'Cerca de mí',h_dlcsv:'Descargar CSV',
       m_lp:'Percentil de<br>aislamiento',m_lg:'% hogares<br>aislados',m_grp:'Idioma<br>dominante',
       stl_tracts:'Distritos mostrados',stl_lep:'Hogares aislados',stl_high:'Distritos muy aislados',
       hint:'👆 Haga clic en un distrito para ver su nivel de aislamiento lingüístico y los idiomas.',
@@ -253,6 +261,7 @@ const GROUP_COLORS=['var(--sp)','var(--ie)','var(--ap)','var(--ot)'];
 const GROUP_HEX=['#0072B2','#CC79A7','#D55E00','#009E73'];
 let DATA=null, GROUP_LABELS=[], LANG_NAMES=[], metric='lp', layer=null, selected=null;
 let selLang=null;               // index into LANG_NAMES when searching by language
+let shownFeats=[];              // features currently passing all filters (for CSV export)
 let countyBounds={};
 
 // residents 5+ isolated for language `idx` in this tract (0 if not present)
@@ -370,6 +379,7 @@ function buildLayer(){
       });
     }
   }).addTo(map);
+  shownFeats=feats;
   renderStats(feats);
 }
 function tipHTML(p){
@@ -391,6 +401,9 @@ function renderStats(feats){
   document.getElementById('st_tracts').textContent=feats.length.toLocaleString();
   document.getElementById('st_lep').textContent=hh?Math.round(lep/hh*100)+'%':'—';
   document.getElementById('st_high').textContent=high.toLocaleString();
+  const dl=document.getElementById('dlcsv');
+  document.getElementById('dlcount').textContent=' ('+feats.length.toLocaleString()+')';
+  dl.disabled=feats.length===0;
 }
 
 // ── detail panel ─────────────────────────────────────────────────────────────
@@ -570,12 +583,50 @@ document.getElementById('nearme').addEventListener('click',()=>{
   },{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
 });
 
+// ── CSV export of the current filtered view (CES 5.0 ⋈ ACS, keyed on tract) ───
+function slug(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
+function csvCell(v){ if(v==null)return''; v=String(v); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function csvScope(){
+  const parts=[];
+  const cty=document.getElementById('county').value; if(cty) parts.push(slug(cty));
+  if(selLang!=null) parts.push(slug(LANG_NAMES[selLang]));
+  const q=document.getElementById('search').value.trim(); if(q) parts.push(slug(q));
+  return parts.length?parts.join('_'):'california';
+}
+function downloadCSV(){
+  const feats=shownFeats||[]; if(!feats.length) return;
+  // hh_lep_* = limited-English HOUSEHOLDS by broad group (ACS C16002)
+  // pop5_lep_* = PERSONS 5+ who speak English < "very well" by named language (ACS C16001)
+  const header=['census_tract_geoid','county','city','zip',
+    'regional_board_number','regional_board_name',
+    'ling_isolation_pct','ling_isolation_percentile',
+    'total_households','limited_english_households',
+    'hh_lep_spanish','hh_lep_other_indo_european','hh_lep_asian_pacific_island','hh_lep_other',
+    ...LANG_NAMES.map(n=>'pop5_lep_'+slug(n))];
+  const rows=[header.join(',')];
+  feats.forEach(f=>{
+    const p=f.properties, g=p.g||[0,0,0,0];
+    const lc=LANG_NAMES.map((_,i)=>{const h=(p.L||[]).find(e=>e[0]===i); return h?h[1]:0;});
+    rows.push([p.t,p.c,p.ci,p.z,p.rb,p.rbn,
+      p.lg==null?'':p.lg, p.lp==null?'':p.lp,
+      p.hh==null?'':p.hh, p.lep==null?'':p.lep,
+      g[0],g[1],g[2],g[3],...lc].map(csvCell).join(','));
+  });
+  const csv='﻿'+rows.join('\r\n');            // UTF-8 BOM so Excel reads it cleanly
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  const a=document.createElement('a');
+  a.href=url; a.download='ca_language_isolation_'+csvScope()+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+document.getElementById('dlcsv').addEventListener('click',downloadCSV);
+
 function setLang(l,btn){
   lang=l;
   document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   ['h_title','h_sub','h_intro','h_metric','h_county','h_langsearch','h_find','h_nearme','h_legend','h_menu',
-   'm_lp','m_lg','m_grp','stl_tracts','stl_lep','stl_high','hint',
+   'm_lp','m_lg','m_grp','stl_tracts','stl_lep','stl_high','hint','h_dlcsv',
    'd_pctl','d_lgl','d_grph','d_langh','src_h','src_ces','src_acs'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.innerHTML=tr(id);
   });

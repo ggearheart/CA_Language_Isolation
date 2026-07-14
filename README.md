@@ -27,6 +27,11 @@ prototype using the latest available data.
   isolated households by the four broad language groups, and the specific
   **languages isolated for** (Spanish, Chinese, Vietnamese, Tagalog, Korean,
   Arabic, Russian/Slavic, Armenian/Persian-group, etc.).
+- **Download CSV** — exports the current filtered view as one row per census
+  tract (the CES 5.0 ⋈ ACS join), keyed on `census_tract_geoid` so it joins to
+  any other tract-level dataset. Household limited-English groups (`hh_lep_*`,
+  from C16002) and person-level named languages (`pop5_lep_*`, from C16001) are
+  fixed columns; UTF-8 with BOM for Excel.
 - Bilingual **English / Spanish** UI, colorblind-safe palette.
 
 ## Data sources
