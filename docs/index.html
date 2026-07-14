@@ -56,6 +56,16 @@ select.filter{cursor:pointer;}
 #langchip .lc-x{margin-left:auto;cursor:pointer;font-weight:800;color:var(--sub);padding:0 3px;line-height:1;}
 #langchip .lc-x:hover{color:var(--danger);}
 .metric-tabs.dim{opacity:.45;}
+.near-btn{width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg);cursor:pointer;font-size:.82rem;font-weight:600;color:var(--ca-blue);
+  display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px;}
+.near-btn:hover{background:#e6edf6;}
+.near-btn:active{transform:translateY(1px);}
+.near-btn.busy{opacity:.6;pointer-events:none;}
+.search-hint{display:none;font-size:.72rem;color:var(--sub);line-height:1.45;margin-bottom:8px;
+  padding:6px 8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;}
+.search-hint.on{display:block;}
+.search-hint b{color:var(--text);}
 .stats-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:4px 0 11px;}
 .stat-card{background:var(--bg);border-radius:6px;padding:8px 5px;text-align:center;border:1px solid var(--border);}
 .stat-num{font-size:1.12rem;font-weight:800;color:var(--ca-blue);line-height:1;}
@@ -139,8 +149,10 @@ select.filter{cursor:pointer;}
       <select class="filter" id="langsearch"><option value="">All languages</option></select>
       <div id="langchip"></div>
 
-      <div class="sb-label" id="h_find">Find a tract</div>
-      <input class="search-box" id="search" placeholder="County or tract GEOID…"/>
+      <div class="sb-label" id="h_find">Find a place</div>
+      <input class="search-box" id="search" placeholder="Address, ZIP, city, region, or tract…"/>
+      <button class="near-btn" id="nearme">📍 <span id="h_nearme">Near me</span></button>
+      <div id="searchhint" class="search-hint"></div>
 
       <div class="stats-bar">
         <div class="stat-card"><div class="stat-num" id="st_tracts">—</div><div class="stat-lbl" id="stl_tracts">Tracts shown</div></div>
@@ -187,7 +199,7 @@ const T={
   en:{h_title:'California Language Isolation Map',
       h_sub:'Linguistic isolation & languages spoken · CalEnviroScreen 5.0 + ACS',
       h_intro:"Explore linguistic isolation across California's census tracts and see which languages households are isolated in. Choose a metric, then click any tract for detail.",
-      h_metric:'Map metric',h_county:'County',h_find:'Find a tract',h_legend:'Legend',h_menu:'Menu',
+      h_metric:'Map metric',h_county:'County',h_find:'Find a place',h_legend:'Legend',h_menu:'Menu',h_nearme:'Near me',
       m_lp:'Isolation<br>percentile',m_lg:'% isolated<br>households',m_grp:'Dominant<br>language',
       stl_tracts:'Tracts shown',stl_lep:'Isolated households',stl_high:'High-isolation tracts',
       hint:'👆 Click a tract on the map to see its linguistic isolation score and language breakdown.',
@@ -196,7 +208,11 @@ const T={
       src_h:'Data sources',
       src_ces:'Linguistic isolation: CalEnviroScreen 5.0 (draft, OEHHA), census-tract level.',
       src_acs:'Languages: U.S. Census ACS 2019–2023 5-year (tables C16002 & C16001).',
-      search:'County or tract GEOID…',allCA:'All California',
+      search:'Address, ZIP, city, region, or tract…',allCA:'All California',
+      searchNoLocal:'No local match for',searchEnter:'press Enter to look it up as an address.',
+      searching:'Searching address…',searchFail:'Address not found. Try a ZIP, city, or region name.',
+      locating:'Finding your location…',geoDenied:'Location access was denied.',
+      geoUnsupported:'Location is not available on this device.',geoOutside:'You appear to be outside California.',
       note:'A "limited-English-speaking household" is one where no one age 14+ speaks English "very well" — the Census definition of linguistic isolation. Named-language counts are people 5+ who speak English less than "very well"; at the tract level the Census reports 11 language groups.',
       lp_lo:'Least isolated',lp_hi:'Most isolated',pctSuffix:'th percentile',noData:'No data',topGroup:'Top group',
       h_langsearch:'Search by language',allLangs:'All languages',showing:'Showing',
@@ -206,7 +222,7 @@ const T={
   es:{h_title:'Mapa de Aislamiento Lingüístico de California',
       h_sub:'Aislamiento lingüístico e idiomas hablados · CalEnviroScreen 5.0 + ACS',
       h_intro:'Explore el aislamiento lingüístico en los distritos censales de California y vea en qué idiomas están aislados los hogares. Elija una métrica y haga clic en un distrito para ver detalles.',
-      h_metric:'Métrica del mapa',h_county:'Condado',h_find:'Buscar distrito',h_legend:'Leyenda',h_menu:'Menú',
+      h_metric:'Métrica del mapa',h_county:'Condado',h_find:'Buscar un lugar',h_legend:'Leyenda',h_menu:'Menú',h_nearme:'Cerca de mí',
       m_lp:'Percentil de<br>aislamiento',m_lg:'% hogares<br>aislados',m_grp:'Idioma<br>dominante',
       stl_tracts:'Distritos mostrados',stl_lep:'Hogares aislados',stl_high:'Distritos muy aislados',
       hint:'👆 Haga clic en un distrito para ver su nivel de aislamiento lingüístico y los idiomas.',
@@ -215,7 +231,11 @@ const T={
       src_h:'Fuentes de datos',
       src_ces:'Aislamiento lingüístico: CalEnviroScreen 5.0 (borrador, OEHHA), por distrito censal.',
       src_acs:'Idiomas: Censo de EE. UU. ACS 2019–2023 5 años (tablas C16002 y C16001).',
-      search:'Condado o GEOID del distrito…',allCA:'Todo California',
+      search:'Dirección, código postal, ciudad, región o distrito…',allCA:'Todo California',
+      searchNoLocal:'Sin coincidencia local para',searchEnter:'presione Enter para buscarlo como dirección.',
+      searching:'Buscando dirección…',searchFail:'Dirección no encontrada. Pruebe un código postal, ciudad o región.',
+      locating:'Buscando su ubicación…',geoDenied:'Se denegó el acceso a la ubicación.',
+      geoUnsupported:'La ubicación no está disponible en este dispositivo.',geoOutside:'Parece estar fuera de California.',
       note:'Un "hogar con inglés limitado" es aquel donde nadie de 14+ años habla inglés "muy bien" — la definición censal de aislamiento lingüístico. Los conteos por idioma son personas de 5+ años que hablan inglés menos que "muy bien"; a nivel de distrito el Censo reporta 11 grupos de idiomas.',
       lp_lo:'Menos aislado',lp_hi:'Más aislado',pctSuffix:'° percentil',noData:'Sin datos',topGroup:'Grupo principal',
       h_langsearch:'Buscar por idioma',allLangs:'Todos los idiomas',showing:'Mostrando',
@@ -280,6 +300,54 @@ function styleFor(f){
           fillColor:featColor(p),fillOpacity:sel?0.92:0.72};
 }
 
+// ── local search matching: tract GEOID · ZIP · city · county · regional board ─
+function matchesQuery(p,q){
+  if(!q) return true;
+  const rm=q.match(/^(?:region|regional board|reg|rwqcb|rb|r)\s*#?\s*([1-9])\b/);  // "region 4", "rb4", "r5"
+  if(rm) return String(p.rb)===rm[1];
+  return String(p.t).includes(q) ||
+         (p.z||'').includes(q) ||
+         (p.ci||'').toLowerCase().includes(q) ||
+         (p.c||'').toLowerCase().includes(q) ||
+         (p.rbn||'').toLowerCase().includes(q);
+}
+
+// ── geometry helpers (bbox cache + point-in-polygon) for Near me / geocoding ──
+function featBBox(geom){
+  let a=180,b=90,c=-180,d=-90;
+  const scan=r=>{for(const pt of r){if(pt[0]<a)a=pt[0];if(pt[0]>c)c=pt[0];if(pt[1]<b)b=pt[1];if(pt[1]>d)d=pt[1];}};
+  const co=geom.coordinates;
+  if(geom.type==='Polygon') co.forEach(scan);
+  else if(geom.type==='MultiPolygon') co.forEach(pp=>pp.forEach(scan));
+  return [a,b,c,d];
+}
+function ringHas(x,y,ring){
+  let inside=false;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+    if(((yi>y)!==(yj>y)) && (x<(xj-xi)*(y-yi)/(yj-yi+1e-15)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function geomHas(geom,x,y){
+  const c=geom.coordinates;
+  const inPart=part=>{ if(!ringHas(x,y,part[0]))return false;
+    for(let k=1;k<part.length;k++) if(ringHas(x,y,part[k])) return false;  // hole
+    return true; };
+  if(geom.type==='Polygon') return inPart(c);
+  if(geom.type==='MultiPolygon'){ for(const part of c) if(inPart(part)) return true; return false; }
+  return false;
+}
+function tractAtPoint(lon,lat){
+  for(const f of DATA.features){ const b=f._bb;
+    if(b && lon>=b[0]&&lon<=b[2]&&lat>=b[1]&&lat<=b[3] && geomHas(f.geometry,lon,lat)) return f; }
+  return null;
+}
+function zoomToFeature(f){
+  const b=f._bb; if(!b) return;
+  map.fitBounds([[b[1],b[0]],[b[3],b[2]]],{padding:[40,40],maxZoom:14});
+}
+
 // ── render layer ─────────────────────────────────────────────────────────────
 function buildLayer(){
   if(layer) map.removeLayer(layer);
@@ -289,7 +357,7 @@ function buildLayer(){
     const p=f.properties;
     if(cty && p.c!==cty) return false;
     if(selLang!=null && langCount(p,selLang)<=0) return false;   // only tracts where the language is isolated for
-    if(q && !(String(p.t).includes(q)||(p.c||'').toLowerCase().includes(q))) return false;
+    if(q && !matchesQuery(p,q)) return false;
     return true;
   });
   layer=L.geoJSON({type:'FeatureCollection',features:feats},{
@@ -425,16 +493,88 @@ document.getElementById('county').addEventListener('change',e=>{
   if(c && countyBounds[c]) map.fitBounds(countyBounds[c],{padding:[20,20]});
   else map.setView([37.3,-119.4],6,{animate:false});
 });
+// ── smart search: local fields instantly, address via geocoder on Enter ──────
+const hintEl=()=>document.getElementById('searchhint');
+function setHint(html){const h=hintEl(); if(!html){h.classList.remove('on');h.innerHTML='';}else{h.classList.add('on');h.innerHTML=html;}}
+function shownCount(){return layer?layer.getLayers().length:0;}
+function fitToLayer(){ if(shownCount()){try{const b=layer.getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[25,25],maxZoom:13});}catch(e){}} }
+
 let searchTimer;
+function runLocalSearch(){
+  buildLayer();
+  const q=document.getElementById('search').value.trim();
+  if(!q){ setHint(''); return; }
+  if(shownCount()>0){ setHint(''); fitToLayer(); }
+  else setHint(`${tr('searchNoLocal')} <b>“${q}”</b> — ${tr('searchEnter')}`);
+}
 document.getElementById('search').addEventListener('input',()=>{
-  clearTimeout(searchTimer); searchTimer=setTimeout(buildLayer,250);
+  clearTimeout(searchTimer); searchTimer=setTimeout(runLocalSearch,300);
+});
+document.getElementById('search').addEventListener('keydown',e=>{
+  if(e.key!=='Enter') return;
+  clearTimeout(searchTimer);
+  const q=document.getElementById('search').value.trim();
+  if(!q) return;
+  buildLayer();
+  if(shownCount()>0) fitToLayer();
+  else geocodeAddress(q);
+});
+
+function gotoTract(feat){                 // clear text filter, show + zoom to a tract
+  document.getElementById('search').value=''; setHint('');
+  buildLayer(); selectTract(feat.properties); zoomToFeature(feat);
+}
+async function geocodeAddress(q){
+  setHint(tr('searching'));
+  const qCA=/california|,\s*ca\b/i.test(q)?q:q+', California';
+  // 1) US Census geocoder → returns the census tract directly (no key)
+  try{
+    const u='https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?address='+
+      encodeURIComponent(qCA)+'&benchmark=Public_AR_Current&vintage=Current_Current&layers=Census+Tracts&format=json';
+    const j=await (await fetch(u)).json();
+    const m=j.result&&j.result.addressMatches&&j.result.addressMatches[0];
+    if(m){
+      const g=m.geographies&&m.geographies['Census Tracts']&&m.geographies['Census Tracts'][0];
+      let feat=g&&DATA.features.find(f=>f.properties.t===g.GEOID);
+      if(!feat&&m.coordinates) feat=tractAtPoint(m.coordinates.x,m.coordinates.y);
+      if(feat){ gotoTract(feat); return; }
+    }
+  }catch(e){/* CORS or network — fall through */}
+  // 2) fallback: OSM Nominatim → coordinates → client point-in-polygon
+  try{
+    const nu='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us&q='+encodeURIComponent(qCA);
+    const arr=await (await fetch(nu,{headers:{Accept:'application/json'}})).json();
+    if(arr&&arr[0]){
+      const feat=tractAtPoint(+arr[0].lon,+arr[0].lat);
+      if(feat){ gotoTract(feat); return; }
+      map.setView([+arr[0].lat,+arr[0].lon],12); setHint(tr('geoOutside')); return;
+    }
+  }catch(e){/* ignore */}
+  setHint(tr('searchFail'));
+}
+
+// ── Near me (geolocation) ────────────────────────────────────────────────────
+document.getElementById('nearme').addEventListener('click',()=>{
+  const btn=document.getElementById('nearme');
+  if(!navigator.geolocation){ setHint(tr('geoUnsupported')); return; }
+  btn.classList.add('busy'); setHint(tr('locating'));
+  navigator.geolocation.getCurrentPosition(pos=>{
+    btn.classList.remove('busy');
+    const lon=pos.coords.longitude, lat=pos.coords.latitude;
+    const feat=tractAtPoint(lon,lat);
+    if(feat) gotoTract(feat);
+    else { setHint(tr('geoOutside')); map.setView([lat,lon],11); }
+  },err=>{
+    btn.classList.remove('busy');
+    setHint(err.code===1?tr('geoDenied'):tr('geoUnsupported'));
+  },{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
 });
 
 function setLang(l,btn){
   lang=l;
   document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['h_title','h_sub','h_intro','h_metric','h_county','h_langsearch','h_find','h_legend','h_menu',
+  ['h_title','h_sub','h_intro','h_metric','h_county','h_langsearch','h_find','h_nearme','h_legend','h_menu',
    'm_lp','m_lg','m_grp','stl_tracts','stl_lep','stl_high','hint',
    'd_pctl','d_lgl','d_grph','d_langh','src_h','src_ces','src_acs'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.innerHTML=tr(id);
@@ -455,10 +595,12 @@ fetch('tracts.json').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return 
   const sel=document.getElementById('county');
   counties.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
   populateLangSelect();   // controlled-vocabulary language dropdown
-  // precompute county bounds
+  // one pass: cache each feature's bbox, and build county bounds from them
   d.features.forEach(f=>{
-    const c=f.properties.c; const b=L.geoJSON(f).getBounds();
-    if(!countyBounds[c]) countyBounds[c]=b; else countyBounds[c].extend(b);
+    const b=featBBox(f.geometry); f._bb=b;
+    const lb=L.latLngBounds([[b[1],b[0]],[b[3],b[2]]]);
+    const c=f.properties.c;
+    if(!countyBounds[c]) countyBounds[c]=lb; else countyBounds[c].extend(lb);
   });
   buildLayer(); renderLegend();
   // The map container can report zero size at init inside a flex/embedded

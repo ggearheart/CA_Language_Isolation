@@ -14,6 +14,11 @@ prototype using the latest available data.
   (no one age 14+ speaks English "very well").
 - **Dominant language** — categorical map coloring each tract by the language group
   most of its isolated households speak.
+- **Find a place** — one search box that matches an **address** (geocoded to its
+  tract via the US Census geocoder, OSM/Nominatim fallback), **ZIP code**, **city**,
+  **Regional Water Board** (by name or "region N"), or **census tract** GEOID — plus
+  a **📍 Near me** button (phone geolocation → the tract you're standing in, via
+  client-side point-in-polygon).
 - **Search by language** — a controlled-vocabulary picker (the 11 named ACS
   tract-level language groups). Selecting one filters the map to tracts where
   that language is isolated for and shades them by the number of residents
@@ -31,6 +36,8 @@ prototype using the latest available data.
 | Linguistic isolation (`ling`, `lingP`) + tract geometry | [CalEnviroScreen 5.0 (draft), OEHHA](https://data.ca.gov/dataset/draft-calenviroscreen-5-0) | Census tract |
 | Limited-English households by broad group | U.S. Census **ACS 2019–2023 5-year**, table **C16002** | Census tract |
 | Languages isolated for (named) | U.S. Census **ACS 2019–2023 5-year**, table **C16001** | Census tract |
+| ZIP + city (per tract) | CalEnviroScreen 5.0 CSV (`ZIP`, `apx_loc`) | Census tract |
+| Regional Water Board | [State Water Board boundaries](https://gis.data.ca.gov/maps/5692f02f7c9a47e384522dfb496f522a) — tract centroid → region (point-in-polygon) | Census tract |
 
 ### A note on language granularity
 
@@ -56,7 +63,10 @@ ogr2ogr -f GeoJSON -t_srs EPSG:4326 -select tract,county,ling,lingP \
   -simplify 100 -lco COORDINATE_PRECISION=4 \
   data/tracts_ces.json data/calenviroscreen50shp_D_12226/CES5_Draft_SHP.shp
 
-# 3. Join geometry + ACS into the map's data file
+# 3. Per-tract ZIP, city, and Regional Board (needs data/ces5.csv + data/rb_boundaries.json)
+python3 scripts/tract_meta.py                          # -> data/tract_meta.json
+
+# 4. Join geometry + ACS + metadata into the map's data file
 python3 scripts/build_data.py                          # -> docs/tracts.json
 ```
 

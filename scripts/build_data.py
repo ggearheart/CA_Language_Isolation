@@ -24,6 +24,7 @@ import json, os
 HERE = os.path.dirname(__file__)
 GEOM = os.path.join(HERE, "..", "data", "tracts_ces.json")
 ACS = os.path.join(HERE, "..", "data", "acs_lang.json")
+META = os.path.join(HERE, "..", "data", "tract_meta.json")
 OUT = os.path.join(HERE, "..", "docs", "tracts.json")
 
 GROUP_ORDER = ["spanish", "other_indo_european", "asian_pacific_island", "other"]
@@ -41,6 +42,7 @@ def r1(x):
 def main():
     geo = json.load(open(GEOM))
     acs = json.load(open(ACS))
+    meta = json.load(open(META))          # ZIP, city, regional board per GEOID
     tracts = acs["tracts"]
     group_labels = [acs["groupLabels"][k] for k in GROUP_ORDER]
 
@@ -60,11 +62,16 @@ def main():
         p = f["properties"]
         geoid = "0" + str(int(p["tract"]))  # CES drops the leading state 0
         a = tracts.get(geoid)
+        mm = meta.get(geoid, {})
         props = {
             "t": geoid,
             "c": p.get("county"),
             "lp": r1(p.get("lingP")),
             "lg": r1(p.get("ling")),
+            "z": mm.get("z", ""),          # ZIP (representative)
+            "ci": mm.get("city", ""),      # approximate city
+            "rb": mm.get("rb", ""),        # regional board number (1-9)
+            "rbn": mm.get("rbn", ""),      # regional board name
         }
         if a:
             matched += 1

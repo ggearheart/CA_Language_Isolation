@@ -2,5 +2,8 @@
 # Bulky raw downloads (regenerate via scripts/ — see README)
 data/*.zip
 data/calenviroscreen50shp_D_12226/
+data/ces5.csv
+# committed small build inputs/outputs: data/tracts_ces.json, data/acs_lang.json,
+# data/tract_meta.json, data/rb_boundaries.json
 # keep the small processed intermediates (data/tracts_ces.json, data/acs_lang.json)
 # so docs/tracts.json can be rebuilt without re-downloading the 130 MB shapefile
