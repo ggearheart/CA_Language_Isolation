@@ -50,6 +50,12 @@ select.filter{cursor:pointer;}
             background:var(--bg);cursor:pointer;font-size:.7rem;font-weight:600;color:var(--sub);
             text-align:center;line-height:1.2;}
 .metric-tab.active{background:var(--ca-blue);border-color:var(--ca-blue);color:#fff;}
+#langchip{display:none;}
+#langchip.on{display:flex;align-items:center;gap:7px;background:#EFF3F9;border:1px solid var(--border);
+  border-left:3px solid var(--ca-gold);border-radius:6px;padding:6px 9px;margin:0 0 8px;font-size:.75rem;}
+#langchip .lc-x{margin-left:auto;cursor:pointer;font-weight:800;color:var(--sub);padding:0 3px;line-height:1;}
+#langchip .lc-x:hover{color:var(--danger);}
+.metric-tabs.dim{opacity:.45;}
 .stats-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:4px 0 11px;}
 .stat-card{background:var(--bg);border-radius:6px;padding:8px 5px;text-align:center;border:1px solid var(--border);}
 .stat-num{font-size:1.12rem;font-weight:800;color:var(--ca-blue);line-height:1;}
@@ -129,6 +135,10 @@ select.filter{cursor:pointer;}
       <div class="sb-label" id="h_county">County</div>
       <select class="filter" id="county"><option value="">All California</option></select>
 
+      <div class="sb-label" id="h_langsearch">Search by language</div>
+      <select class="filter" id="langsearch"><option value="">All languages</option></select>
+      <div id="langchip"></div>
+
       <div class="sb-label" id="h_find">Find a tract</div>
       <input class="search-box" id="search" placeholder="County or tract GEOID…"/>
 
@@ -189,6 +199,8 @@ const T={
       search:'County or tract GEOID…',allCA:'All California',
       note:'A "limited-English-speaking household" is one where no one age 14+ speaks English "very well" — the Census definition of linguistic isolation. Named-language counts are people 5+ who speak English less than "very well"; at the tract level the Census reports 11 language groups.',
       lp_lo:'Least isolated',lp_hi:'Most isolated',pctSuffix:'th percentile',noData:'No data',topGroup:'Top group',
+      h_langsearch:'Search by language',allLangs:'All languages',showing:'Showing',
+      langCap:'residents isolated (5+)',langNone:'not present',
       langN:{'Spanish':'Spanish','Other Indo-European':'Other Indo-European','Asian & Pacific Island':'Asian & Pacific Island','Other languages':'Other languages',
              'Arabic':'Arabic','Korean':'Korean','Chinese (incl. Mandarin, Cantonese)':'Chinese (Mandarin, Cantonese)','Russian, Polish, or other Slavic languages':'Russian, Polish, or Slavic','Other Indo-European languages':'Other Indo-European','French, Haitian, or Cajun':'French, Haitian, or Cajun','Other Asian and Pacific Island languages':'Other Asian & Pacific Island','Vietnamese':'Vietnamese','Tagalog (incl. Filipino)':'Tagalog (Filipino)','German or other West Germanic languages':'German or West Germanic'}},
   es:{h_title:'Mapa de Aislamiento Lingüístico de California',
@@ -206,6 +218,8 @@ const T={
       search:'Condado o GEOID del distrito…',allCA:'Todo California',
       note:'Un "hogar con inglés limitado" es aquel donde nadie de 14+ años habla inglés "muy bien" — la definición censal de aislamiento lingüístico. Los conteos por idioma son personas de 5+ años que hablan inglés menos que "muy bien"; a nivel de distrito el Censo reporta 11 grupos de idiomas.',
       lp_lo:'Menos aislado',lp_hi:'Más aislado',pctSuffix:'° percentil',noData:'Sin datos',topGroup:'Grupo principal',
+      h_langsearch:'Buscar por idioma',allLangs:'Todos los idiomas',showing:'Mostrando',
+      langCap:'residentes aislados (5+)',langNone:'no presente',
       langN:{'Spanish':'Español','Other Indo-European':'Otras indoeuropeas','Asian & Pacific Island':'Asiáticas y del Pacífico','Other languages':'Otras lenguas',
              'Arabic':'Árabe','Korean':'Coreano','Chinese (incl. Mandarin, Cantonese)':'Chino (mandarín, cantonés)','Russian, Polish, or other Slavic languages':'Ruso, polaco o eslavas','Other Indo-European languages':'Otras indoeuropeas','French, Haitian, or Cajun':'Francés, haitiano o cajún','Other Asian and Pacific Island languages':'Otras asiáticas y del Pacífico','Vietnamese':'Vietnamita','Tagalog (incl. Filipino)':'Tagalo (filipino)','German or other West Germanic languages':'Alemán o germánicas occ.'}}
 };
@@ -218,9 +232,26 @@ const trLang=n=>T[lang].langN[n]||n;
 const GROUP_COLORS=['var(--sp)','var(--ie)','var(--ap)','var(--ot)'];
 const GROUP_HEX=['#0072B2','#CC79A7','#D55E00','#009E73'];
 let DATA=null, GROUP_LABELS=[], LANG_NAMES=[], metric='lp', layer=null, selected=null;
+let selLang=null;               // index into LANG_NAMES when searching by language
 let countyBounds={};
 
+// residents 5+ isolated for language `idx` in this tract (0 if not present)
+function langCount(p,idx){
+  if(idx==null||!p.L) return 0;
+  const hit=p.L.find(e=>e[0]===idx); return hit?hit[1]:0;
+}
+const LANG_BREAKS=[25,100,300,750];   // person-count class breaks
+function colorLANG(p){
+  const c=langCount(p,selLang);
+  if(c<=0) return '#c9ced6';
+  return c<LANG_BREAKS[0]?SEQ[0]:c<LANG_BREAKS[1]?SEQ[1]:c<LANG_BREAKS[2]?SEQ[2]:c<LANG_BREAKS[3]?SEQ[3]:SEQ[4];
+}
+
 const map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([37.3,-119.4],6);
+// One persistent canvas renderer, reused for every buildLayer(). Creating a
+// fresh renderer per rebuild only repaints on the next map move, so filters
+// that don't pan (e.g. language search) would leave the canvas blank.
+const RENDERER=L.canvas({padding:0.5});
 L.control.zoom({position:'topright'}).addTo(map);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
   attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:19
@@ -238,6 +269,7 @@ function dominantGroup(g){ // index of max broad group, or -1
 function colorGRP(p){ const i=dominantGroup(p.g); return i<0?'#c9ced6':GROUP_HEX[i]; }
 
 function featColor(p){
+  if(selLang!=null) return colorLANG(p);
   if(metric==='lp') return colorLP(p.lp);
   if(metric==='lg') return colorLG(p.lg);
   return colorGRP(p);
@@ -256,11 +288,12 @@ function buildLayer(){
   const feats=DATA.features.filter(f=>{
     const p=f.properties;
     if(cty && p.c!==cty) return false;
+    if(selLang!=null && langCount(p,selLang)<=0) return false;   // only tracts where the language is isolated for
     if(q && !(String(p.t).includes(q)||(p.c||'').toLowerCase().includes(q))) return false;
     return true;
   });
   layer=L.geoJSON({type:'FeatureCollection',features:feats},{
-    renderer:L.canvas(),style:styleFor,
+    renderer:RENDERER,style:styleFor,
     onEachFeature:(f,lyr)=>{
       const p=f.properties;
       lyr.on('click',()=>selectTract(p));
@@ -273,6 +306,11 @@ function buildLayer(){
 }
 function tipHTML(p){
   const pc=p.lp==null?tr('noData'):Math.round(p.lp)+tr('pctSuffix');
+  if(selLang!=null){
+    const c=langCount(p,selLang);
+    return `<b>${p.c} — ${p.t.slice(-6)}</b><br>${trLang(LANG_NAMES[selLang])}: `+
+           `${c>0?c.toLocaleString()+' '+tr('langCap'):tr('langNone')}<br>${tr('d_pctl')}: ${pc}`;
+  }
   const dg=dominantGroup(p.g);
   const dl=dg>=0?trLang(GROUP_LABELS[dg]):'—';
   return `<b>${p.c} — ${p.t.slice(-6)}</b><br>${tr('d_pctl')}: ${pc}<br>${tr('topGroup')}: ${dl}`;
@@ -322,6 +360,16 @@ function barRow(label,val,max,color,valTxt){
 // ── legends ──────────────────────────────────────────────────────────────────
 function renderLegend(){
   const rows=[];
+  if(selLang!=null){
+    const lbls=['<'+LANG_BREAKS[0],LANG_BREAKS[0]+'–'+LANG_BREAKS[1],LANG_BREAKS[1]+'–'+LANG_BREAKS[2],
+                LANG_BREAKS[2]+'–'+LANG_BREAKS[3],LANG_BREAKS[3]+'+'];
+    lbls.forEach((l,i)=>rows.push([SEQ[i],l]));
+    const html=rows.map(([c,l])=>`<div class="leg-row"><span class="leg-sw" style="background:${c}"></span>${l}</div>`).join('');
+    document.getElementById('legend').innerHTML=html;
+    document.getElementById('map-legend').innerHTML=`<b>${trLang(LANG_NAMES[selLang])}</b>`+
+      `<div style="font-size:.63rem;color:var(--sub);margin:-2px 0 4px">${tr('langCap')}</div>`+html;
+    return;
+  }
   if(metric==='grp'){
     GROUP_LABELS.forEach((g,i)=>rows.push([GROUP_HEX[i],trLang(g)]));
     rows.push(['#c9ced6',tr('noData')]);
@@ -339,11 +387,37 @@ function renderLegend(){
 }
 
 // ── controls ─────────────────────────────────────────────────────────────────
+// ── language search (controlled vocabulary) ──────────────────────────────────
+function populateLangSelect(){
+  const sel=document.getElementById('langsearch'); const cur=sel.value;
+  sel.innerHTML=`<option value="">${tr('allLangs')}</option>`;
+  LANG_NAMES.map((n,i)=>[i,trLang(n)]).sort((a,b)=>a[1].localeCompare(b[1]))
+    .forEach(([i,label])=>{const o=document.createElement('option');o.value=i;o.textContent=label;sel.appendChild(o);});
+  sel.value=cur;
+}
+function renderLangChip(){
+  const chip=document.getElementById('langchip'), tabs=document.getElementById('metric-tabs');
+  if(selLang==null){chip.classList.remove('on');chip.innerHTML='';tabs.classList.remove('dim');return;}
+  chip.classList.add('on'); tabs.classList.add('dim');
+  chip.innerHTML=`<span>${tr('showing')}: <b>${trLang(LANG_NAMES[selLang])}</b></span>`+
+    `<span class="lc-x" role="button" tabindex="0" title="clear" onclick="clearLang()">✕</span>`;
+}
+function applyLang(idx){          // idx=null clears the language search
+  selLang=idx;
+  document.getElementById('langsearch').value=idx==null?'':String(idx);
+  renderLangChip(); buildLayer(); renderLegend();
+}
+function clearLang(){ applyLang(null); }
+document.getElementById('langsearch').addEventListener('change',e=>{
+  const v=e.target.value; applyLang(v===''?null:parseInt(v,10));
+});
+
 document.getElementById('metric-tabs').addEventListener('click',e=>{
   const t=e.target.closest('.metric-tab'); if(!t)return;
   document.querySelectorAll('.metric-tab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active'); metric=t.dataset.metric;
-  if(layer) layer.setStyle(styleFor); renderLegend();
+  if(selLang!=null){ applyLang(null); }          // choosing a metric exits language search
+  else { if(layer) layer.setStyle(styleFor); renderLegend(); }
 });
 document.getElementById('county').addEventListener('change',e=>{
   buildLayer();
@@ -360,13 +434,14 @@ function setLang(l,btn){
   lang=l;
   document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['h_title','h_sub','h_intro','h_metric','h_county','h_find','h_legend','h_menu',
+  ['h_title','h_sub','h_intro','h_metric','h_county','h_langsearch','h_find','h_legend','h_menu',
    'm_lp','m_lg','m_grp','stl_tracts','stl_lep','stl_high','hint',
    'd_pctl','d_lgl','d_grph','d_langh','src_h','src_ces','src_acs'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.innerHTML=tr(id);
   });
   document.getElementById('search').placeholder=tr('search');
   const opt0=document.querySelector('#county option[value=""]'); if(opt0) opt0.textContent=tr('allCA');
+  populateLangSelect(); renderLangChip();
   renderLegend();
   if(selected){ const p=DATA.features.find(f=>f.properties.t===selected); if(p) selectTract(p.properties); }
 }
@@ -379,6 +454,7 @@ fetch('tracts.json').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return 
   const counties=[...new Set(d.features.map(f=>f.properties.c))].sort();
   const sel=document.getElementById('county');
   counties.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  populateLangSelect();   // controlled-vocabulary language dropdown
   // precompute county bounds
   d.features.forEach(f=>{
     const c=f.properties.c; const b=L.geoJSON(f).getBounds();

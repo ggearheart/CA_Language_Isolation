@@ -14,6 +14,10 @@ prototype using the latest available data.
   (no one age 14+ speaks English "very well").
 - **Dominant language** — categorical map coloring each tract by the language group
   most of its isolated households speak.
+- **Search by language** — a controlled-vocabulary picker (the 11 named ACS
+  tract-level language groups). Selecting one filters the map to tracts where
+  that language is isolated for and shades them by the number of residents
+  isolated (combines with the county filter).
 - **Per-tract detail** — click any tract for its isolation score, a breakdown of
   isolated households by the four broad language groups, and the specific
   **languages isolated for** (Spanish, Chinese, Vietnamese, Tagalog, Korean,

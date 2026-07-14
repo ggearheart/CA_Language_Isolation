@@ -72,10 +72,11 @@ def main():
             props["lep"] = a["lep_hh"]
             props["g"] = [a["groups"].get(k, 0) for k in GROUP_ORDER]
             # drop the catch-all "Other and unspecified" from the named list so
-            # the popup highlights actual named languages; keep top 8
+            # the popup highlights actual named languages; keep all remaining
+            # groups (max ~10) so language search is exact, not top-N truncated
             langs = [(n, c) for n, c in a["langs"]
                      if not n.lower().startswith("other and unspecified")]
-            props["L"] = [[idx(n), c] for n, c in langs[:8]]
+            props["L"] = [[idx(n), c] for n, c in langs]
         f["properties"] = props
         kept.append(f)
 
