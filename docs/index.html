@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>California Language Isolation Map — CalEnviroScreen 5.0 + ACS</title>
+<style>
+:root{
+  /* Sequential ramp for linguistic-isolation intensity (ColorBrewer YlOrRd) */
+  --s1:#ffffb2; --s2:#fecc5c; --s3:#fd8d3c; --s4:#f03b20; --s5:#bd0026;
+  /* Categorical dominant-language groups (Okabe-Ito, colorblind-safe) */
+  --sp:#0072B2;   /* Spanish            */
+  --ie:#CC79A7;   /* Other Indo-European*/
+  --ap:#D55E00;   /* Asian & Pacific Is.*/
+  --ot:#009E73;   /* Other languages    */
+  --nodata:#c9ced6;
+  --ca-blue:#003368; --ca-gold:#FDB913;
+  --bg:#F0F4F8; --white:#fff; --text:#1a2332; --sub:#4B5563; --border:#d0d8e4;
+  --radius:8px;
+}
+:focus-visible{outline:3px solid var(--ca-blue);outline-offset:2px;border-radius:2px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);
+     color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+header{background:var(--ca-blue);color:#fff;padding:0 16px;height:52px;
+       display:flex;align-items:center;justify-content:space-between;
+       flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.35);z-index:1001;}
+.hdr-brand{display:flex;align-items:center;gap:11px;}
+.hdr-title{font-size:.98rem;font-weight:700;line-height:1.2;}
+.hdr-title small{display:block;font-size:.68rem;font-weight:400;opacity:.82;}
+.hdr-right{display:flex;gap:6px;align-items:center;}
+.lang-btn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;
+          padding:4px 11px;border-radius:4px;cursor:pointer;font-size:.78rem;font-weight:500;}
+.lang-btn.active{background:var(--ca-gold);border-color:var(--ca-gold);color:#000;}
+.app-body{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:326px;background:#fff;border-right:1px solid var(--border);
+         display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.sb-scroll{overflow-y:auto;flex:1;padding:12px 13px;}
+.intro{font-size:.76rem;color:var(--sub);line-height:1.5;margin-bottom:11px;}
+.sb-label{font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;
+          color:var(--sub);margin:13px 0 5px;font-weight:700;}
+.sb-label:first-child{margin-top:0;}
+.search-box,select.filter{width:100%;padding:6px 9px;border:1px solid var(--border);
+            border-radius:var(--radius);font-size:.83rem;outline:none;
+            margin-bottom:7px;background:var(--bg);}
+.search-box:focus,select.filter:focus{border-color:var(--ca-blue);}
+select.filter{cursor:pointer;}
+.metric-tabs{display:flex;gap:4px;margin-bottom:9px;}
+.metric-tab{flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:var(--radius);
+            background:var(--bg);cursor:pointer;font-size:.7rem;font-weight:600;color:var(--sub);
+            text-align:center;line-height:1.2;}
+.metric-tab.active{background:var(--ca-blue);border-color:var(--ca-blue);color:#fff;}
+.stats-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:4px 0 11px;}
+.stat-card{background:var(--bg);border-radius:6px;padding:8px 5px;text-align:center;border:1px solid var(--border);}
+.stat-num{font-size:1.12rem;font-weight:800;color:var(--ca-blue);line-height:1;}
+.stat-lbl{font-size:.6rem;color:var(--sub);margin-top:3px;line-height:1.2;}
+.legend{display:flex;flex-direction:column;gap:3px;margin-bottom:6px;}
+.leg-row{display:flex;align-items:center;gap:8px;font-size:.74rem;padding:2px 3px;}
+.leg-sw{width:16px;height:16px;border-radius:3px;flex-shrink:0;border:1px solid rgba(0,0,0,.12);}
+/* Detail panel */
+#detail{display:none;border-top:2px solid var(--ca-gold);margin-top:12px;padding-top:11px;}
+#detail.on{display:block;}
+.d-county{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);font-weight:700;}
+.d-tract{font-size:.95rem;font-weight:800;color:var(--ca-blue);margin:1px 0 8px;}
+.d-hero{display:flex;gap:8px;margin-bottom:10px;}
+.d-hero .stat-card{flex:1;}
+.d-hero .stat-num{font-size:1.35rem;}
+.bar-row{display:flex;align-items:center;gap:7px;font-size:.73rem;margin-bottom:4px;}
+.bar-lbl{width:104px;flex-shrink:0;color:var(--text);line-height:1.15;}
+.bar-track{flex:1;height:13px;background:var(--bg);border-radius:3px;overflow:hidden;border:1px solid var(--border);}
+.bar-fill{height:100%;border-radius:3px 0 0 3px;}
+.bar-val{width:38px;text-align:right;flex-shrink:0;color:var(--sub);font-weight:600;font-size:.68rem;}
+.d-sub{font-size:.66rem;color:var(--sub);margin:11px 0 5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+.d-note{font-size:.66rem;color:var(--sub);line-height:1.45;margin-top:9px;font-style:italic;}
+.hint{font-size:.72rem;color:var(--sub);text-align:center;padding:16px 8px;line-height:1.5;}
+.sources{font-size:.63rem;color:var(--sub);line-height:1.5;padding:10px 13px;border-top:1px solid var(--border);background:#fafbfc;}
+.sources a{color:var(--ca-blue);}
+/* MAP */
+#map-wrap{flex:1;position:relative;overflow:hidden;background:#e8edf2;}
+#map{position:absolute;inset:0;}
+.map-legend{position:absolute;bottom:14px;left:14px;background:rgba(255,255,255,.94);
+            border:1px solid var(--border);border-radius:6px;padding:9px 11px;
+            font-size:.71rem;z-index:500;max-width:210px;box-shadow:0 1px 6px rgba(0,0,0,.14);}
+.map-legend b{font-size:.72rem;color:var(--text);display:block;margin-bottom:5px;}
+.map-legend .leg-row{font-size:.7rem;}
+.leaflet-tract-tip{font-size:.76rem;line-height:1.4;}
+.leaflet-tract-tip b{color:var(--ca-blue);}
+@media (max-width:760px){
+  .sidebar{position:absolute;z-index:1000;height:100%;box-shadow:2px 0 12px rgba(0,0,0,.2);
+           transform:translateX(-100%);transition:transform .25s;}
+  .sidebar.open{transform:translateX(0);}
+  .mobile-toggle{display:flex!important;}
+}
+.mobile-toggle{display:none;position:absolute;top:62px;left:12px;z-index:900;
+  background:var(--ca-blue);color:#fff;border:none;border-radius:6px;padding:8px 12px;
+  font-size:.78rem;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<header>
+  <div class="hdr-brand">
+    <a href="https://oehha.ca.gov/calenviroscreen" target="_blank" rel="noopener" style="text-decoration:none;color:#fff;display:flex;align-items:center;gap:11px;">
+      <span style="font-size:1.6rem;line-height:1;">🗣️</span>
+      <span class="hdr-title" id="h_title">California Language Isolation Map
+        <small id="h_sub">Linguistic isolation &amp; languages spoken · CalEnviroScreen 5.0 + ACS</small>
+      </span>
+    </a>
+  </div>
+  <div class="hdr-right">
+    <button class="lang-btn active" onclick="setLang('en',this)">EN</button>
+    <button class="lang-btn" onclick="setLang('es',this)">ES</button>
+  </div>
+</header>
+<div class="app-body">
+  <button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰ <span id="h_menu">Menu</span></button>
+  <div class="sidebar">
+    <div class="sb-scroll">
+      <p class="intro" id="h_intro">Explore linguistic isolation across California's census tracts and see which languages households are isolated in. Choose a metric, then click any tract for detail.</p>
+
+      <div class="sb-label" id="h_metric">Map metric</div>
+      <div class="metric-tabs" id="metric-tabs">
+        <div class="metric-tab active" data-metric="lp" id="m_lp">Isolation<br>percentile</div>
+        <div class="metric-tab" data-metric="lg" id="m_lg">% isolated<br>households</div>
+        <div class="metric-tab" data-metric="grp" id="m_grp">Dominant<br>language</div>
+      </div>
+
+      <div class="sb-label" id="h_county">County</div>
+      <select class="filter" id="county"><option value="">All California</option></select>
+
+      <div class="sb-label" id="h_find">Find a tract</div>
+      <input class="search-box" id="search" placeholder="County or tract GEOID…"/>
+
+      <div class="stats-bar">
+        <div class="stat-card"><div class="stat-num" id="st_tracts">—</div><div class="stat-lbl" id="stl_tracts">Tracts shown</div></div>
+        <div class="stat-card"><div class="stat-num" id="st_lep">—</div><div class="stat-lbl" id="stl_lep">Isolated households</div></div>
+        <div class="stat-card"><div class="stat-num" id="st_high">—</div><div class="stat-lbl" id="stl_high">High-isolation tracts</div></div>
+      </div>
+
+      <div class="sb-label" id="h_legend">Legend</div>
+      <div class="legend" id="legend"></div>
+
+      <div id="detail">
+        <div class="d-county" id="d-county"></div>
+        <div class="d-tract" id="d-tract"></div>
+        <div class="d-hero">
+          <div class="stat-card"><div class="stat-num" id="d-pct"></div><div class="stat-lbl" id="d-pctl">Isolation percentile</div></div>
+          <div class="stat-card"><div class="stat-num" id="d-lg"></div><div class="stat-lbl" id="d-lgl">% isolated HH</div></div>
+        </div>
+        <div class="d-sub" id="d-grph">Isolated households by language group</div>
+        <div id="d-groups"></div>
+        <div class="d-sub" id="d-langh">Languages isolated for (residents 5+)</div>
+        <div id="d-langs"></div>
+        <div class="d-note" id="d-note"></div>
+      </div>
+      <div class="hint" id="hint">👆 Click a tract on the map to see its linguistic isolation score and language breakdown.</div>
+    </div>
+    <div class="sources">
+      <b id="src_h">Data sources</b><br>
+      <span id="src_ces">Linguistic isolation: CalEnviroScreen 5.0 (draft, OEHHA), census-tract level.</span><br>
+      <span id="src_acs">Languages: U.S. Census ACS 2019–2023 5-year (tables C16002 &amp; C16001).</span>
+    </div>
+  </div>
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div class="map-legend" id="map-legend"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// i18n
+// ─────────────────────────────────────────────────────────────────────────────
+let lang='en';
+const T={
+  en:{h_title:'California Language Isolation Map',
+      h_sub:'Linguistic isolation & languages spoken · CalEnviroScreen 5.0 + ACS',
+      h_intro:"Explore linguistic isolation across California's census tracts and see which languages households are isolated in. Choose a metric, then click any tract for detail.",
+      h_metric:'Map metric',h_county:'County',h_find:'Find a tract',h_legend:'Legend',h_menu:'Menu',
+      m_lp:'Isolation<br>percentile',m_lg:'% isolated<br>households',m_grp:'Dominant<br>language',
+      stl_tracts:'Tracts shown',stl_lep:'Isolated households',stl_high:'High-isolation tracts',
+      hint:'👆 Click a tract on the map to see its linguistic isolation score and language breakdown.',
+      d_pctl:'Isolation percentile',d_lgl:'% isolated HH',
+      d_grph:'Isolated households by language group',d_langh:'Languages isolated for (residents 5+)',
+      src_h:'Data sources',
+      src_ces:'Linguistic isolation: CalEnviroScreen 5.0 (draft, OEHHA), census-tract level.',
+      src_acs:'Languages: U.S. Census ACS 2019–2023 5-year (tables C16002 & C16001).',
+      search:'County or tract GEOID…',allCA:'All California',
+      note:'A "limited-English-speaking household" is one where no one age 14+ speaks English "very well" — the Census definition of linguistic isolation. Named-language counts are people 5+ who speak English less than "very well"; at the tract level the Census reports 11 language groups.',
+      lp_lo:'Least isolated',lp_hi:'Most isolated',pctSuffix:'th percentile',noData:'No data',topGroup:'Top group',
+      langN:{'Spanish':'Spanish','Other Indo-European':'Other Indo-European','Asian & Pacific Island':'Asian & Pacific Island','Other languages':'Other languages',
+             'Arabic':'Arabic','Korean':'Korean','Chinese (incl. Mandarin, Cantonese)':'Chinese (Mandarin, Cantonese)','Russian, Polish, or other Slavic languages':'Russian, Polish, or Slavic','Other Indo-European languages':'Other Indo-European','French, Haitian, or Cajun':'French, Haitian, or Cajun','Other Asian and Pacific Island languages':'Other Asian & Pacific Island','Vietnamese':'Vietnamese','Tagalog (incl. Filipino)':'Tagalog (Filipino)','German or other West Germanic languages':'German or West Germanic'}},
+  es:{h_title:'Mapa de Aislamiento Lingüístico de California',
+      h_sub:'Aislamiento lingüístico e idiomas hablados · CalEnviroScreen 5.0 + ACS',
+      h_intro:'Explore el aislamiento lingüístico en los distritos censales de California y vea en qué idiomas están aislados los hogares. Elija una métrica y haga clic en un distrito para ver detalles.',
+      h_metric:'Métrica del mapa',h_county:'Condado',h_find:'Buscar distrito',h_legend:'Leyenda',h_menu:'Menú',
+      m_lp:'Percentil de<br>aislamiento',m_lg:'% hogares<br>aislados',m_grp:'Idioma<br>dominante',
+      stl_tracts:'Distritos mostrados',stl_lep:'Hogares aislados',stl_high:'Distritos muy aislados',
+      hint:'👆 Haga clic en un distrito para ver su nivel de aislamiento lingüístico y los idiomas.',
+      d_pctl:'Percentil de aislamiento',d_lgl:'% hogares aislados',
+      d_grph:'Hogares aislados por grupo de idioma',d_langh:'Idiomas de aislamiento (residentes 5+)',
+      src_h:'Fuentes de datos',
+      src_ces:'Aislamiento lingüístico: CalEnviroScreen 5.0 (borrador, OEHHA), por distrito censal.',
+      src_acs:'Idiomas: Censo de EE. UU. ACS 2019–2023 5 años (tablas C16002 y C16001).',
+      search:'Condado o GEOID del distrito…',allCA:'Todo California',
+      note:'Un "hogar con inglés limitado" es aquel donde nadie de 14+ años habla inglés "muy bien" — la definición censal de aislamiento lingüístico. Los conteos por idioma son personas de 5+ años que hablan inglés menos que "muy bien"; a nivel de distrito el Censo reporta 11 grupos de idiomas.',
+      lp_lo:'Menos aislado',lp_hi:'Más aislado',pctSuffix:'° percentil',noData:'Sin datos',topGroup:'Grupo principal',
+      langN:{'Spanish':'Español','Other Indo-European':'Otras indoeuropeas','Asian & Pacific Island':'Asiáticas y del Pacífico','Other languages':'Otras lenguas',
+             'Arabic':'Árabe','Korean':'Coreano','Chinese (incl. Mandarin, Cantonese)':'Chino (mandarín, cantonés)','Russian, Polish, or other Slavic languages':'Ruso, polaco o eslavas','Other Indo-European languages':'Otras indoeuropeas','French, Haitian, or Cajun':'Francés, haitiano o cajún','Other Asian and Pacific Island languages':'Otras asiáticas y del Pacífico','Vietnamese':'Vietnamita','Tagalog (incl. Filipino)':'Tagalo (filipino)','German or other West Germanic languages':'Alemán o germánicas occ.'}}
+};
+const tr=id=>T[lang][id];
+const trLang=n=>T[lang].langN[n]||n;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Map + data
+// ─────────────────────────────────────────────────────────────────────────────
+const GROUP_COLORS=['var(--sp)','var(--ie)','var(--ap)','var(--ot)'];
+const GROUP_HEX=['#0072B2','#CC79A7','#D55E00','#009E73'];
+let DATA=null, GROUP_LABELS=[], LANG_NAMES=[], metric='lp', layer=null, selected=null;
+let countyBounds={};
+
+const map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([37.3,-119.4],6);
+L.control.zoom({position:'topright'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:19
+}).addTo(map);
+
+// ── colour scales ────────────────────────────────────────────────────────────
+const SEQ=['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'];
+function colorLP(v){ if(v==null) return '#c9ced6';
+  return v<20?SEQ[0]:v<40?SEQ[1]:v<60?SEQ[2]:v<80?SEQ[3]:SEQ[4]; }
+function colorLG(v){ if(v==null) return '#c9ced6';
+  return v<5?SEQ[0]:v<10?SEQ[1]:v<20?SEQ[2]:v<35?SEQ[3]:SEQ[4]; }
+function dominantGroup(g){ // index of max broad group, or -1
+  if(!g) return -1; let mi=-1,mv=0;
+  g.forEach((v,i)=>{ if(v>mv){mv=v;mi=i;} }); return mv>0?mi:-1; }
+function colorGRP(p){ const i=dominantGroup(p.g); return i<0?'#c9ced6':GROUP_HEX[i]; }
+
+function featColor(p){
+  if(metric==='lp') return colorLP(p.lp);
+  if(metric==='lg') return colorLG(p.lg);
+  return colorGRP(p);
+}
+function styleFor(f){
+  const p=f.properties, sel=selected&&p.t===selected;
+  return {color:sel?'#003368':'#7c8797',weight:sel?2.2:0.25,
+          fillColor:featColor(p),fillOpacity:sel?0.92:0.72};
+}
+
+// ── render layer ─────────────────────────────────────────────────────────────
+function buildLayer(){
+  if(layer) map.removeLayer(layer);
+  const cty=document.getElementById('county').value;
+  const q=document.getElementById('search').value.trim().toLowerCase();
+  const feats=DATA.features.filter(f=>{
+    const p=f.properties;
+    if(cty && p.c!==cty) return false;
+    if(q && !(String(p.t).includes(q)||(p.c||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  layer=L.geoJSON({type:'FeatureCollection',features:feats},{
+    renderer:L.canvas(),style:styleFor,
+    onEachFeature:(f,lyr)=>{
+      const p=f.properties;
+      lyr.on('click',()=>selectTract(p));
+      lyr.on('mouseover',()=>{
+        lyr.bindTooltip(tipHTML(p),{className:'leaflet-tract-tip',sticky:true}).openTooltip();
+      });
+    }
+  }).addTo(map);
+  renderStats(feats);
+}
+function tipHTML(p){
+  const pc=p.lp==null?tr('noData'):Math.round(p.lp)+tr('pctSuffix');
+  const dg=dominantGroup(p.g);
+  const dl=dg>=0?trLang(GROUP_LABELS[dg]):'—';
+  return `<b>${p.c} — ${p.t.slice(-6)}</b><br>${tr('d_pctl')}: ${pc}<br>${tr('topGroup')}: ${dl}`;
+}
+
+// ── stats ────────────────────────────────────────────────────────────────────
+function renderStats(feats){
+  let hh=0,lep=0,high=0;
+  feats.forEach(f=>{const p=f.properties; hh+=p.hh||0; lep+=p.lep||0; if(p.lp!=null&&p.lp>=90)high++;});
+  document.getElementById('st_tracts').textContent=feats.length.toLocaleString();
+  document.getElementById('st_lep').textContent=hh?Math.round(lep/hh*100)+'%':'—';
+  document.getElementById('st_high').textContent=high.toLocaleString();
+}
+
+// ── detail panel ─────────────────────────────────────────────────────────────
+function selectTract(p){
+  selected=p.t;
+  if(layer) layer.setStyle(styleFor);
+  document.getElementById('hint').style.display='none';
+  const d=document.getElementById('detail'); d.classList.add('on');
+  document.getElementById('d-county').textContent=lang==='es'?('Condado de '+p.c):(p.c+' County');
+  document.getElementById('d-tract').textContent='Tract '+p.t.slice(-6)+' · GEOID '+p.t;
+  document.getElementById('d-pct').textContent=p.lp==null?'—':Math.round(p.lp);
+  document.getElementById('d-lg').textContent=p.lg==null?'—':p.lg+'%';
+  // groups
+  const gTot=(p.g||[]).reduce((a,b)=>a+b,0);
+  const gMax=Math.max(1,...(p.g||[0]));
+  document.getElementById('d-groups').innerHTML=(p.g||[]).map((v,i)=>{
+    if(v<=0) return '';
+    return barRow(trLang(GROUP_LABELS[i]),v,gMax,GROUP_COLORS[i],v.toLocaleString());
+  }).join('')||`<div class="d-note">${lang==='en'?'No isolated households reported.':'No se reportan hogares aislados.'}</div>`;
+  // languages
+  const langs=p.L||[]; const lMax=langs.length?langs[0][1]:1;
+  document.getElementById('d-langs').innerHTML=langs.length?langs.map(([idx,c])=>
+    barRow(trLang(LANG_NAMES[idx]),c,lMax,'var(--ca-blue)',c.toLocaleString())).join(''):
+    `<div class="d-note">${lang==='en'?'No named-language detail.':'Sin detalle por idioma.'}</div>`;
+  document.getElementById('d-note').textContent=tr('note');
+  if(window.innerWidth<=760) document.querySelector('.sidebar').classList.add('open');
+}
+function barRow(label,val,max,color,valTxt){
+  const w=Math.max(3,Math.round(val/max*100));
+  return `<div class="bar-row"><div class="bar-lbl">${label}</div>`+
+    `<div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${color}"></div></div>`+
+    `<div class="bar-val">${valTxt}</div></div>`;
+}
+
+// ── legends ──────────────────────────────────────────────────────────────────
+function renderLegend(){
+  const rows=[];
+  if(metric==='grp'){
+    GROUP_LABELS.forEach((g,i)=>rows.push([GROUP_HEX[i],trLang(g)]));
+    rows.push(['#c9ced6',tr('noData')]);
+  }else{
+    const scale=metric==='lp'?['0–20','20–40','40–60','60–80','80–100']
+                             :['0–5%','5–10%','10–20%','20–35%','35%+'];
+    scale.forEach((lbl,i)=>rows.push([SEQ[i],lbl]));
+    rows.push(['#c9ced6',tr('noData')]);
+  }
+  const html=rows.map(([c,l])=>`<div class="leg-row"><span class="leg-sw" style="background:${c}"></span>${l}</div>`).join('');
+  document.getElementById('legend').innerHTML=html;
+  const cap=metric==='lp'?tr('d_pctl'):metric==='lg'?tr('d_lgl'):(lang==='en'?'Dominant language group':'Grupo de idioma dominante');
+  document.getElementById('map-legend').innerHTML=`<b>${cap}</b>`+
+    (metric==='lp'?`<div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="font-size:.63rem">${tr('lp_lo')}</span><span style="flex:1;height:11px;border-radius:3px;background:linear-gradient(90deg,${SEQ.join(',')})"></span><span style="font-size:.63rem">${tr('lp_hi')}</span></div>`:html);
+}
+
+// ── controls ─────────────────────────────────────────────────────────────────
+document.getElementById('metric-tabs').addEventListener('click',e=>{
+  const t=e.target.closest('.metric-tab'); if(!t)return;
+  document.querySelectorAll('.metric-tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); metric=t.dataset.metric;
+  if(layer) layer.setStyle(styleFor); renderLegend();
+});
+document.getElementById('county').addEventListener('change',e=>{
+  buildLayer();
+  const c=e.target.value;
+  if(c && countyBounds[c]) map.fitBounds(countyBounds[c],{padding:[20,20]});
+  else map.setView([37.3,-119.4],6,{animate:false});
+});
+let searchTimer;
+document.getElementById('search').addEventListener('input',()=>{
+  clearTimeout(searchTimer); searchTimer=setTimeout(buildLayer,250);
+});
+
+function setLang(l,btn){
+  lang=l;
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['h_title','h_sub','h_intro','h_metric','h_county','h_find','h_legend','h_menu',
+   'm_lp','m_lg','m_grp','stl_tracts','stl_lep','stl_high','hint',
+   'd_pctl','d_lgl','d_grph','d_langh','src_h','src_ces','src_acs'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.innerHTML=tr(id);
+  });
+  document.getElementById('search').placeholder=tr('search');
+  const opt0=document.querySelector('#county option[value=""]'); if(opt0) opt0.textContent=tr('allCA');
+  renderLegend();
+  if(selected){ const p=DATA.features.find(f=>f.properties.t===selected); if(p) selectTract(p.properties); }
+}
+
+// ── boot ─────────────────────────────────────────────────────────────────────
+fetch('tracts.json').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+.then(d=>{
+  DATA=d; GROUP_LABELS=d.groupLabels; LANG_NAMES=d.langNames;
+  // county dropdown + bounds
+  const counties=[...new Set(d.features.map(f=>f.properties.c))].sort();
+  const sel=document.getElementById('county');
+  counties.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  // precompute county bounds
+  d.features.forEach(f=>{
+    const c=f.properties.c; const b=L.geoJSON(f).getBounds();
+    if(!countyBounds[c]) countyBounds[c]=b; else countyBounds[c].extend(b);
+  });
+  buildLayer(); renderLegend();
+  // The map container can report zero size at init inside a flex/embedded
+  // pane, leaving the canvas overlay unpainted until the first interaction.
+  // Force a size recalc + redraw once layout has settled.
+  requestAnimationFrame(()=>{ map.invalidateSize(); map.setView([37.3,-119.4],6,{animate:false}); });
+  setTimeout(()=>map.invalidateSize(),300);
+})
+.catch(e=>{
+  document.getElementById('map-wrap').insertAdjacentHTML('beforeend',
+    `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b91c1c;font-weight:600;padding:20px;text-align:center">Could not load tracts.json — ${e.message}</div>`);
+});
+</script>
+</body>
+</html>
