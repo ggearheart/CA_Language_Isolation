@@ -374,7 +374,7 @@ function geomHas(geom,x,y){
   if(geom.type==='MultiPolygon'){ for(const part of c) if(inPart(part)) return true; return false; }
   return false;
 }
-function tractAtPoint(lon,lat){
+function areaAtPoint(lon,lat){
   for(const f of DATA.features){ const b=f._bb;
     if(b && lon>=b[0]&&lon<=b[2]&&lat>=b[1]&&lat<=b[3] && geomHas(f.geometry,lon,lat)) return f; }
   return null;
@@ -586,7 +586,7 @@ async function geocodeAddress(q){
     if(m){
       const g=m.geographies&&m.geographies['Census Tracts']&&m.geographies['Census Tracts'][0];
       let feat=g&&DATA.features.find(f=>f.properties.t===g.GEOID);
-      if(!feat&&m.coordinates) feat=tractAtPoint(m.coordinates.x,m.coordinates.y);
+      if(!feat&&m.coordinates) feat=areaAtPoint(m.coordinates.x,m.coordinates.y);
       if(feat){ gotoTract(feat); return; }
     }
   }catch(e){/* CORS or network — fall through */}
@@ -595,7 +595,7 @@ async function geocodeAddress(q){
     const nu='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us&q='+encodeURIComponent(qCA);
     const arr=await (await fetch(nu,{headers:{Accept:'application/json'}})).json();
     if(arr&&arr[0]){
-      const feat=tractAtPoint(+arr[0].lon,+arr[0].lat);
+      const feat=areaAtPoint(+arr[0].lon,+arr[0].lat);
       if(feat){ gotoTract(feat); return; }
       map.setView([+arr[0].lat,+arr[0].lon],12); setHint(tr('geoOutside')); return;
     }
@@ -611,7 +611,7 @@ document.getElementById('nearme').addEventListener('click',()=>{
   navigator.geolocation.getCurrentPosition(pos=>{
     btn.classList.remove('busy');
     const lon=pos.coords.longitude, lat=pos.coords.latitude;
-    const feat=tractAtPoint(lon,lat);
+    const feat=areaAtPoint(lon,lat);
     if(feat) gotoTract(feat);
     else { setHint(tr('geoOutside')); map.setView([lat,lon],11); }
   },err=>{
@@ -705,7 +705,7 @@ function prepDataset(d){
   d._cb=cb;
   return d;
 }
-function activateGeo(g){
+function activateGeo(g,anchor){
   geo=g; DATA=DS[g]; GROUP_LABELS=DATA.groupLabels; LANG_NAMES=DATA.langNames;
   countyBounds=DATA._cb;
   document.querySelectorAll('#geo-tabs .metric-tab').forEach(t=>t.classList.toggle('active',t.dataset.geo===g));
@@ -725,6 +725,7 @@ function activateGeo(g){
   document.getElementById('detail').classList.remove('on');
   document.getElementById('hint').style.display='';
   buildLayer(); renderLegend();
+  snapToAnchor(anchor);   // keep the user's view; carry the selection across
 }
 // Which source the isolation percentile comes from for the active geography:
 // "CES" at tract (CalEnviroScreen lingP) vs "ACS" at PUMA (CES is tract-only,
@@ -742,11 +743,41 @@ function loadGeo(g){
   return fetch(GEO_FILE[g]).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(d=>{ DS[g]=prepDataset(d); return DS[g]; });
 }
+// What the user is currently looking at, as [lon,lat]: the selected area's
+// centre when it's actually on screen, otherwise the map centre.
+function anchorPoint(){
+  if(selected&&DATA){
+    const f=DATA.features.find(x=>x.properties.t===selected);
+    if(f&&f._bb){
+      const b=f._bb, lon=(b[0]+b[2])/2, lat=(b[1]+b[3])/2;
+      if(map.getBounds().contains([lat,lon])) return [lon,lat];
+    }
+  }
+  const c=map.getCenter(); return [c.lng,c.lat];
+}
+// After a geography switch: keep the view, and select the polygon in the new
+// geography covering the same spot. Only move the map if that polygon doesn't
+// fit on screen (a PUMA swallowing a zoomed-in tract) — and only ever zoom out,
+// so switching back doesn't rocket into a single tract.
+function snapToAnchor(anchor){
+  if(!anchor) return;
+  const f=areaAtPoint(anchor[0],anchor[1]);
+  if(!f) return;
+  selectTract(f.properties);
+  const b=f._bb;
+  const fb=L.latLngBounds([[b[1],b[0]],[b[3],b[2]]]);
+  // animate:false — a geography toggle should reframe instantly, and it keeps
+  // this off Leaflet's animated-zoom path (which no-ops for deltas within
+  // zoomAnimationThreshold if a zoom transition never completes).
+  if(!map.getBounds().contains(fb) && map.getBoundsZoom(fb)<map.getZoom())
+    map.fitBounds(fb,{padding:[30,30],animate:false});
+}
 document.getElementById('geo-tabs').addEventListener('click',e=>{
   const t=e.target.closest('.metric-tab'); if(!t) return;
   const g=t.dataset.geo; if(g===geo) return;
   t.style.opacity='.6';
-  loadGeo(g).then(()=>{ t.style.opacity=''; activateGeo(g); map.setView([37.3,-119.4],6,{animate:false}); })
+  const anchor=anchorPoint();          // capture before DATA is swapped
+  loadGeo(g).then(()=>{ t.style.opacity=''; activateGeo(g,anchor); })
             .catch(err=>{ t.style.opacity=''; setHint('Could not load '+GEO_FILE[g]+' — '+err.message); });
 });
 
