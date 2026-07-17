@@ -8,8 +8,13 @@ prototype using the latest available data.
 
 ## What it shows
 
+- **Geography switch** — view the data by **census tract** (9,106, the default) or
+  by **PUMA** (281 Public Use Microdata Areas — the geography PUMS microdata is
+  published at, ~100k+ people each). PUMAs trade granularity for much larger ACS
+  samples. See [PUMA caveats](#what-is-and-isnt-available-at-puma).
 - **Isolation percentile** — CalEnviroScreen 5.0 linguistic-isolation percentile
   for each of California's 9,106 census tracts (statewide 0–100 ranking).
+  *Tract only* — CalEnviroScreen has no PUMA-level indicator.
 - **% isolated households** — share of households that are "limited-English-speaking"
   (no one age 14+ speaks English "very well").
 - **Dominant language** — categorical map coloring each tract by the language group
@@ -43,6 +48,25 @@ prototype using the latest available data.
 | Languages isolated for (named) | U.S. Census **ACS 2020–2024 5-year**, table **C16001** | Census tract |
 | ZIP + city (per tract) | CalEnviroScreen 5.0 CSV (`ZIP`, `apx_loc`) | Census tract |
 | Regional Water Board | [State Water Board boundaries](https://gis.data.ca.gov/maps/5692f02f7c9a47e384522dfb496f522a) — tract centroid → region (point-in-polygon) | Census tract |
+| PUMA language data | U.S. Census **ACS 2020–2024 5-year**, tables **C16002** + **C16001** | PUMA |
+| PUMA boundaries | [TIGER/Line 2024 `PUMA20`](https://www2.census.gov/geo/tiger/TIGER2024/PUMA20/) (2020-vintage PUMAs) | PUMA |
+
+### What is (and isn't) available at PUMA
+
+CalEnviroScreen is published at **census-tract level only**, so switching to PUMA
+changes what the map can honestly show:
+
+| | Census tract | PUMA |
+|---|---|---|
+| Isolation percentile (CES `lingP`) | ✅ | ❌ tab disabled — no CES at this geography |
+| % isolated households | ✅ from CES `ling` | ✅ computed from ACS C16002 |
+| Dominant language / language search | ✅ | ✅ |
+| ZIP, city, Regional Water Board | ✅ | ❌ tract-level attributes |
+| Address search / 📍 Near me / CSV | ✅ | ✅ |
+
+PUMAs do not nest cleanly inside counties (9 rural PUMAs combine several), so each
+PUMA's county list is derived **spatially** — every tract centroid inside the PUMA
+contributes its county. The county filter uses that crosswalk.
 
 ### A note on language granularity
 
@@ -73,7 +97,19 @@ python3 scripts/tract_meta.py                          # -> data/tract_meta.json
 
 # 4. Join geometry + ACS + metadata into the map's data file
 python3 scripts/build_data.py                          # -> docs/tracts.json
+
+# 5. PUMA geography (optional second dataset). Boundaries:
+#    https://www2.census.gov/geo/tiger/TIGER2024/PUMA20/tl_2024_06_puma20.zip
+ogr2ogr -f GeoJSON -t_srs EPSG:4326 -select GEOID20,NAMELSAD20 \
+  -simplify 0.0005 -lco COORDINATE_PRECISION=4 \
+  data/pumas_geom.json tl_2024_06_puma20.shp
+CENSUS_KEY=xxxxxxxx python3 scripts/pull_acs.py puma   # -> data/acs_lang_puma.json
+python3 scripts/build_puma.py                          # -> docs/pumas.json
 ```
+
+`build_puma.py` must run **after** `build_data.py`: it seeds its language index
+from `docs/tracts.json` so both geographies share identical language IDs (the
+language search depends on that).
 
 ## Running locally
 
@@ -86,10 +122,13 @@ cd docs && python3 -m http.server 8137
 
 ```
 docs/            GitHub Pages site
-  index.html     the map (self-contained; loads tracts.json)
+  index.html     the map (self-contained; loads tracts.json / pumas.json)
   tracts.json    9,106 tracts: geometry + CES score + ACS language breakdown
+  pumas.json     281 PUMAs: geometry + ACS language breakdown (lazy-loaded)
 scripts/
-  pull_acs.py    Census ACS pull -> data/acs_lang.json
-  build_data.py  join CES geometry + ACS -> docs/tracts.json
-data/            intermediate build inputs (raw shapefile is gitignored)
+  pull_acs.py    Census ACS pull [tract|puma] -> data/acs_lang[_puma].json
+  build_data.py  join CES geometry + ACS + metadata -> docs/tracts.json
+  tract_meta.py  ZIP, city, Regional Board per tract -> data/tract_meta.json
+  build_puma.py  join PUMA geometry + ACS + county crosswalk -> docs/pumas.json
+data/            intermediate build inputs (raw shapefile/CSV are gitignored)
 ```

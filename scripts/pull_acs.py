@@ -13,15 +13,22 @@ Two tables:
              publishes at census-tract level (B16001's ~40 languages are
              not released for tracts).
 
-Usage: CENSUS_KEY=xxxx python3 pull_acs.py
-Output: data/acs_lang.json
+Geography (argv[1]): "tract" (default) or "puma".
+  tract -> data/acs_lang.json      keyed by 11-digit tract GEOID
+  puma  -> data/acs_lang_puma.json keyed by 7-char PUMA GEOID (state + PUMA code)
+PUMA is the geography PUMS microdata is published at (~100k+ people each):
+coarser than tracts, but larger samples. CalEnviroScreen has no PUMA equivalent.
+
+Usage: CENSUS_KEY=xxxx python3 pull_acs.py [tract|puma]
 """
-import json, os, sys, urllib.request, urllib.parse
+import json, os, sys, urllib.request
 
 YEAR = "2024"
 BASE = f"https://api.census.gov/data/{YEAR}/acs/acs5"
 KEY = os.environ.get("CENSUS_KEY")
-OUT = os.path.join(os.path.dirname(__file__), "..", "data", "acs_lang.json")
+GEO = (sys.argv[1] if len(sys.argv) > 1 else "tract").lower()
+_D = os.path.join(os.path.dirname(__file__), "..", "data")
+OUT = os.path.join(_D, "acs_lang_puma.json" if GEO == "puma" else "acs_lang.json")
 VARS_URL = f"{BASE}/variables.json"
 
 # C16002: total households + the four "Limited English speaking household" groups
@@ -45,25 +52,29 @@ def fetch_json(url):
         return json.load(r)
 
 
+PUMA_FOR = "public%20use%20microdata%20area"
+
+
 def api(get_vars):
-    q = urllib.parse.urlencode({
-        "get": ",".join(get_vars),
-        "for": "tract:*",
-        "in": "state:06 county:*",
-        "key": KEY,
-    })
-    # requests wants the two `in` clauses space-joined; census accepts "&in="
-    url = f"{BASE}?get={','.join(get_vars)}&for=tract:*&in=state:06&in=county:*&key={KEY}"
+    g = ",".join(get_vars)
+    if GEO == "puma":
+        url = f"{BASE}?get={g}&for={PUMA_FOR}:*&in=state:06&key={KEY}"
+    else:
+        url = f"{BASE}?get={g}&for=tract:*&in=state:06&in=county:*&key={KEY}"
     return fetch_json(url)
 
 
 def rows_to_dict(rows):
-    """Census response -> {GEOID: {col: value}} using state+county+tract."""
+    """Census response -> {GEOID: {col: value}}.
+    tract GEOID = state+county+tract (11); PUMA GEOID = state+puma code (7)."""
     head = rows[0]
     idx = {c: i for i, c in enumerate(head)}
     out = {}
     for row in rows[1:]:
-        geoid = row[idx["state"]] + row[idx["county"]] + row[idx["tract"]]
+        if GEO == "puma":
+            geoid = row[idx["state"]] + row[idx["public use microdata area"]]
+        else:
+            geoid = row[idx["state"]] + row[idx["county"]] + row[idx["tract"]]
         out[geoid] = {c: row[i] for c, i in idx.items()}
     return out
 

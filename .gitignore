@@ -1,4 +1,6 @@
 .DS_Store
+__pycache__/
+*.pyc
 # Bulky raw downloads (regenerate via scripts/ — see README)
 data/*.zip
 data/calenviroscreen50shp_D_12226/
