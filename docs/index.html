@@ -51,11 +51,9 @@ select.filter{cursor:pointer;}
             text-align:center;line-height:1.2;}
 .metric-tab.active{background:var(--ca-blue);border-color:var(--ca-blue);color:#fff;}
 .metric-tab small{font-weight:400;opacity:.75;font-size:.86em;}
-.metric-tab.na{opacity:.38;cursor:not-allowed;}
 .geo-note{display:none;font-size:.7rem;color:var(--sub);line-height:1.45;margin:-3px 0 9px;
   padding:6px 8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;}
 .geo-note.on{display:block;}
-.stats-bar.two{grid-template-columns:1fr 1fr;}
 #langchip{display:none;}
 #langchip.on{display:flex;align-items:center;gap:7px;background:#EFF3F9;border:1px solid var(--border);
   border-left:3px solid var(--ca-gold);border-radius:6px;padding:6px 9px;margin:0 0 8px;font-size:.75rem;}
@@ -222,10 +220,11 @@ const T={
       h_intro:"Explore linguistic isolation across California's census tracts and see which languages households are isolated in. Choose a metric, then click any tract for detail.",
       h_metric:'Map metric',h_county:'County',h_find:'Find a place',h_legend:'Legend',h_menu:'Menu',h_nearme:'Near me',h_dlcsv:'Download CSV',
       h_geo:'Geography',g_tract:'Census tract<br><small>9,106 areas</small>',g_puma:'PUMA<br><small>281 areas</small>',
-      stl_pumas:'PUMAs shown',
-      pumaNoteBox:'<b>PUMA</b> — the geography PUMS microdata is published at (~100k+ people each). Larger ACS samples, less granular. CalEnviroScreen is tract-only, so the isolation percentile is unavailable here.',
-      cesNA:'CalEnviroScreen is published at census-tract level only — not available for PUMAs.',
-      pumaNote:'CalEnviroScreen has no PUMA-level indicator, so % isolated households here is computed directly from ACS C16002.',
+      stl_pumas:'PUMAs shown',stl_high_puma:'High-isolation PUMAs',
+      pumaNoteBox:'<b>PUMA</b> — the geography PUMS microdata is published at (~100k+ people each). Larger ACS samples, less granular. CalEnviroScreen is tract-only, so the percentile here is <b>ACS-based</b>: it ranks the 281 PUMAs against each other, and is not the CalEnviroScreen percentile.',
+      cesPctNote:'CalEnviroScreen linguistic-isolation percentile — ranks this tract against all 9,106 California tracts.',
+      acsPctNote:'ACS-based percentile — ranks this PUMA against all 281 California PUMAs by % limited-English households (C16002). Not the CalEnviroScreen percentile, which is tract-only.',
+      pumaNote:'CalEnviroScreen has no PUMA-level indicator, so both % isolated households and the isolation percentile here are derived from ACS C16002 — the percentile ranks the 281 PUMAs against each other.',
       m_lp:'Isolation<br>percentile',m_lg:'% isolated<br>households',m_grp:'Dominant<br>language',
       stl_tracts:'Tracts shown',stl_lep:'Isolated households',stl_high:'High-isolation tracts',
       hint:'👆 Click a tract on the map to see its linguistic isolation score and language breakdown.',
@@ -250,10 +249,11 @@ const T={
       h_intro:'Explore el aislamiento lingüístico en los distritos censales de California y vea en qué idiomas están aislados los hogares. Elija una métrica y haga clic en un distrito para ver detalles.',
       h_metric:'Métrica del mapa',h_county:'Condado',h_find:'Buscar un lugar',h_legend:'Leyenda',h_menu:'Menú',h_nearme:'Cerca de mí',h_dlcsv:'Descargar CSV',
       h_geo:'Geografía',g_tract:'Distrito censal<br><small>9,106 áreas</small>',g_puma:'PUMA<br><small>281 áreas</small>',
-      stl_pumas:'PUMAs mostradas',
-      pumaNoteBox:'<b>PUMA</b> — la geografía en la que se publican los microdatos PUMS (~100 mil+ personas cada una). Muestras ACS más grandes, menos detalle. CalEnviroScreen solo existe por distrito censal, así que el percentil de aislamiento no está disponible aquí.',
-      cesNA:'CalEnviroScreen se publica solo por distrito censal — no disponible para PUMAs.',
-      pumaNote:'CalEnviroScreen no tiene indicador a nivel PUMA, por lo que el % de hogares aislados aquí se calcula directamente de ACS C16002.',
+      stl_pumas:'PUMAs mostradas',stl_high_puma:'PUMAs muy aisladas',
+      pumaNoteBox:'<b>PUMA</b> — la geografía en la que se publican los microdatos PUMS (~100 mil+ personas cada una). Muestras ACS más grandes, menos detalle. CalEnviroScreen solo existe por distrito censal, así que el percentil aquí se basa en <b>ACS</b>: clasifica las 281 PUMAs entre sí y no es el percentil de CalEnviroScreen.',
+      cesPctNote:'Percentil de aislamiento lingüístico de CalEnviroScreen — clasifica este distrito entre los 9,106 distritos de California.',
+      acsPctNote:'Percentil basado en ACS — clasifica esta PUMA entre las 281 PUMAs de California por % de hogares con inglés limitado (C16002). No es el percentil de CalEnviroScreen, que solo existe por distrito censal.',
+      pumaNote:'CalEnviroScreen no tiene indicador a nivel PUMA, por lo que tanto el % de hogares aislados como el percentil aquí se derivan de ACS C16002 — el percentil clasifica las 281 PUMAs entre sí.',
       m_lp:'Percentil de<br>aislamiento',m_lg:'% hogares<br>aislados',m_grp:'Idioma<br>dominante',
       stl_tracts:'Distritos mostrados',stl_lep:'Hogares aislados',stl_high:'Distritos muy aislados',
       hint:'👆 Haga clic en un distrito para ver su nivel de aislamiento lingüístico y los idiomas.',
@@ -411,10 +411,7 @@ function buildLayer(){
 }
 function tipHTML(p){
   const title=geo==='puma'?p.nm:`${p.c} — ${p.t.slice(-6)}`;
-  // CES percentile at tract; at PUMA there is no CES, so show ACS % isolated
-  const stat=geo==='puma'
-    ? `${tr('d_lgl')}: ${p.lg==null?tr('noData'):p.lg+'%'}`
-    : `${tr('d_pctl')}: ${p.lp==null?tr('noData'):Math.round(p.lp)+tr('pctSuffix')}`;
+  const stat=`${pctLabel()}: ${p.lp==null?tr('noData'):Math.round(p.lp)+tr('pctSuffix')}`;
   if(selLang!=null){
     const c=langCount(p,selLang);
     return `<b>${title}</b><br>${trLang(LANG_NAMES[selLang])}: `+
@@ -432,12 +429,9 @@ function renderStats(feats){
   document.getElementById('st_tracts').textContent=feats.length.toLocaleString();
   document.getElementById('stl_tracts').textContent=geo==='puma'?tr('stl_pumas'):tr('stl_tracts');
   document.getElementById('st_lep').textContent=hh?Math.round(lep/hh*100)+'%':'—';
+  // top-decile areas by whichever percentile the active geography supports
   document.getElementById('st_high').textContent=high.toLocaleString();
-  // "high isolation" is a CalEnviroScreen percentile — tract-only, so drop the
-  // card at PUMA rather than show a metric that doesn't exist there
-  const puma=geo==='puma';
-  document.getElementById('card_high').style.display=puma?'none':'';
-  document.querySelector('.stats-bar').classList.toggle('two',puma);
+  document.getElementById('stl_high').textContent=geo==='puma'?tr('stl_high_puma'):tr('stl_high');
   const dl=document.getElementById('dlcsv');
   document.getElementById('dlcount').textContent=' ('+feats.length.toLocaleString()+')';
   dl.disabled=feats.length===0;
@@ -454,6 +448,7 @@ function selectTract(p){
     :(lang==='es'?('Condado de '+p.c):(p.c+' County'));
   document.getElementById('d-tract').textContent=isPuma?p.nm
     :('Tract '+p.t.slice(-6)+' · GEOID '+p.t);
+  document.getElementById('d-pctl').textContent=pctLabel();
   document.getElementById('d-pct').textContent=p.lp==null?'—':Math.round(p.lp);
   document.getElementById('d-lg').textContent=p.lg==null?'—':p.lg+'%';
   // groups
@@ -502,7 +497,7 @@ function renderLegend(){
   }
   const html=rows.map(([c,l])=>`<div class="leg-row"><span class="leg-sw" style="background:${c}"></span>${l}</div>`).join('');
   document.getElementById('legend').innerHTML=html;
-  const cap=metric==='lp'?tr('d_pctl'):metric==='lg'?tr('d_lgl'):(lang==='en'?'Dominant language group':'Grupo de idioma dominante');
+  const cap=metric==='lp'?pctLabel():metric==='lg'?tr('d_lgl'):(lang==='en'?'Dominant language group':'Grupo de idioma dominante');
   document.getElementById('map-legend').innerHTML=`<b>${cap}</b>`+
     (metric==='lp'?`<div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="font-size:.63rem">${tr('lp_lo')}</span><span style="flex:1;height:11px;border-radius:3px;background:linear-gradient(90deg,${SEQ.join(',')})"></span><span style="font-size:.63rem">${tr('lp_hi')}</span></div>`:html);
 }
@@ -647,6 +642,7 @@ function downloadCSV(){
   // those are tract-level only, so the schema differs by geography.
   const header=puma
     ? ['puma_geoid','puma_name','counties','pct_limited_english_households',
+       'acs_isolation_percentile_among_pumas',
        'total_households','limited_english_households',...hhCols,...langCols]
     : ['census_tract_geoid','county','city','zip','regional_board_number','regional_board_name',
        'ling_isolation_pct','ling_isolation_percentile',
@@ -656,7 +652,8 @@ function downloadCSV(){
     const p=f.properties, g=p.g||[0,0,0,0];
     const lc=LANG_NAMES.map((_,i)=>{const h=(p.L||[]).find(e=>e[0]===i); return h?h[1]:0;});
     const base=puma
-      ? [p.t,p.nm,p.c,p.lg==null?'':p.lg,p.hh==null?'':p.hh,p.lep==null?'':p.lep]
+      ? [p.t,p.nm,p.c,p.lg==null?'':p.lg,p.lp==null?'':p.lp,
+         p.hh==null?'':p.hh,p.lep==null?'':p.lep]
       : [p.t,p.c,p.ci,p.z,p.rb,p.rbn,p.lg==null?'':p.lg,p.lp==null?'':p.lp,
          p.hh==null?'':p.hh,p.lep==null?'':p.lep];
     rows.push([...base,g[0],g[1],g[2],g[3],...lc].map(csvCell).join(','));
@@ -729,17 +726,16 @@ function activateGeo(g){
   document.getElementById('hint').style.display='';
   buildLayer(); renderLegend();
 }
-// The CalEnviroScreen percentile exists only at census-tract level.
+// Which source the isolation percentile comes from for the active geography:
+// "CES" at tract (CalEnviroScreen lingP) vs "ACS" at PUMA (CES is tract-only,
+// so PUMAs are ranked against each other using ACS C16002). Two different
+// statistics — always show the source next to the number.
+function pctSrc(){ return (DATA&&DATA.pctSrc)||'CES'; }
+function pctLabel(){ return tr('d_pctl')+' ('+pctSrc()+')'; }
 function updateMetricAvailability(){
   const lp=document.querySelector('.metric-tab[data-metric="lp"]');
-  const na=geo==='puma';
-  lp.classList.toggle('na',na);
-  lp.title=na?tr('cesNA'):'';
-  if(na&&metric==='lp'){
-    metric='lg';
-    document.querySelectorAll('#metric-tabs .metric-tab').forEach(x=>x.classList.remove('active'));
-    document.querySelector('.metric-tab[data-metric="lg"]').classList.add('active');
-  }
+  lp.classList.remove('na'); lp.title=tr(pctSrc()==='ACS'?'acsPctNote':'cesPctNote');
+  lp.innerHTML=tr('m_lp')+'<br><small>('+pctSrc()+')</small>';
 }
 function loadGeo(g){
   if(DS[g]) return Promise.resolve(DS[g]);

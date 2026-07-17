@@ -12,9 +12,14 @@ prototype using the latest available data.
   by **PUMA** (281 Public Use Microdata Areas — the geography PUMS microdata is
   published at, ~100k+ people each). PUMAs trade granularity for much larger ACS
   samples. See [PUMA caveats](#what-is-and-isnt-available-at-puma).
-- **Isolation percentile** — CalEnviroScreen 5.0 linguistic-isolation percentile
-  for each of California's 9,106 census tracts (statewide 0–100 ranking).
-  *Tract only* — CalEnviroScreen has no PUMA-level indicator.
+- **Isolation percentile** — at **tract**, the CalEnviroScreen 5.0
+  linguistic-isolation percentile (each tract ranked against all 9,106). At
+  **PUMA**, CalEnviroScreen doesn't exist, so the tab switches to an
+  **ACS-based** percentile ranking the 281 PUMAs against each other by %
+  limited-English households (C16002). These are two different statistics, so
+  the active source is always shown — the tab reads *Isolation percentile
+  (CES)* or *(ACS)*, and the legend, tooltip, detail card and CSV column name
+  carry it too.
 - **% isolated households** — share of households that are "limited-English-speaking"
   (no one age 14+ speaks English "very well").
 - **Dominant language** — categorical map coloring each tract by the language group
@@ -58,7 +63,7 @@ changes what the map can honestly show:
 
 | | Census tract | PUMA |
 |---|---|---|
-| Isolation percentile (CES `lingP`) | ✅ | ❌ tab disabled — no CES at this geography |
+| Isolation percentile | ✅ **CES** `lingP` (vs 9,106 tracts) | ⚠️ **ACS**-derived (vs 281 PUMAs) — labeled `(ACS)`, *not* the CES percentile |
 | % isolated households | ✅ from CES `ling` | ✅ computed from ACS C16002 |
 | Dominant language / language search | ✅ | ✅ |
 | ZIP, city, Regional Water Board | ✅ | ❌ tract-level attributes |

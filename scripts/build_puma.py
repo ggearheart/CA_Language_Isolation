@@ -17,7 +17,7 @@ Counties: PUMAs do not nest cleanly in counties (rural PUMAs combine several),
 so each PUMA's county list is derived spatially — every tract centroid inside
 the PUMA contributes its county.
 """
-import json, os, sys
+import bisect, json, os, sys
 from collections import defaultdict
 
 from tract_meta import rings_of, bbox, centroid, in_ring
@@ -85,7 +85,7 @@ def main():
             "nm": p.get("NAMELSAD20", "").replace(" PUMA", ""),
             "c": ", ".join(cs),
             "cs": cs,
-            "lp": None,          # CalEnviroScreen has no PUMA-level indicator
+            "lp": None,          # filled below: ACS-derived percentile, NOT CES
         }
         if a:
             matched += 1
@@ -100,8 +100,24 @@ def main():
         f["properties"] = props
         feats.append(f)
 
-    out = {"type": "FeatureCollection", "langNames": lang_names,
-           "groupLabels": group_labels, "features": feats}
+    # ACS-derived isolation percentile: rank the PUMAs against each other by
+    # % limited-English households (C16002). This is NOT the CalEnviroScreen
+    # percentile — CES is tract-only — so it is tagged pctSrc="ACS" and the UI
+    # labels it as such. Ties get the midrank, so identical values score alike.
+    vals = sorted(f["properties"]["lg"] for f in feats
+                  if f["properties"].get("lg") is not None)
+    n = len(vals)
+    for f in feats:
+        v = f["properties"].get("lg")
+        if v is None or not n:
+            continue
+        below = bisect.bisect_left(vals, v)
+        equal = bisect.bisect_right(vals, v) - below
+        f["properties"]["lp"] = round((below + 0.5 * equal) / n * 100, 1)
+
+    out = {"type": "FeatureCollection", "pctSrc": "ACS",
+           "langNames": lang_names, "groupLabels": group_labels,
+           "features": feats}
     json.dump(out, open(OUT, "w"), separators=(",", ":"))
     sz = os.path.getsize(OUT) / 1e6
     multi = sum(1 for f in feats if len(f["properties"]["cs"]) > 1)

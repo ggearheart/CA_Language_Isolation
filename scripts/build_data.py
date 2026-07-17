@@ -89,6 +89,7 @@ def main():
 
     out = {
         "type": "FeatureCollection",
+        "pctSrc": "CES",          # `lp` is the CalEnviroScreen lingP percentile
         "langNames": lang_names,
         "groupLabels": group_labels,
         "features": kept,
