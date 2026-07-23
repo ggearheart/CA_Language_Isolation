@@ -35,11 +35,13 @@ prototype using the latest available data.
   isolated (combines with the county filter).
 - **Regional Water Board buttons** — one click filters and zooms to any of the
   9 Regional Water Quality Control Boards (tract geography; PUMAs have no board).
-- **Per-tract detail** — click any area for its isolation score and a
-  **population-by-language table (age 5+)**: for each language, the number of
+- **Per-area detail & scope summary** — click any area for its isolation score
+  and a **population-by-language table (age 5+)**: per language, the number of
   speakers, that as a **% of the area's population**, and how many are
-  limited-English — with a population total. Plus limited-English **households**
-  by the four broad language groups.
+  limited-English — with a population total, plus limited-English **households**
+  by the four broad language groups. With nothing selected, the same breakdown
+  is shown **aggregated over the current filter** — statewide, a county, a
+  Regional Board, or a language. Click an area again to return to the summary.
 - **Download CSV** — exports the current filtered view as one row per area (the
   CES 5.0 ⋈ ACS join), keyed on `census_tract_geoid` / `puma_geoid` so it joins
   to any other dataset at that geography. Per language it carries total speakers
