@@ -33,15 +33,20 @@ prototype using the latest available data.
   tract-level language groups). Selecting one filters the map to tracts where
   that language is isolated for and shades them by the number of residents
   isolated (combines with the county filter).
-- **Per-tract detail** — click any tract for its isolation score, a breakdown of
-  isolated households by the four broad language groups, and the specific
-  **languages isolated for** (Spanish, Chinese, Vietnamese, Tagalog, Korean,
-  Arabic, Russian/Slavic, Armenian/Persian-group, etc.).
-- **Download CSV** — exports the current filtered view as one row per census
-  tract (the CES 5.0 ⋈ ACS join), keyed on `census_tract_geoid` so it joins to
-  any other tract-level dataset. Household limited-English groups (`hh_lep_*`,
-  from C16002) and person-level named languages (`pop5_lep_*`, from C16001) are
-  fixed columns; UTF-8 with BOM for Excel.
+- **Regional Water Board buttons** — one click filters and zooms to any of the
+  9 Regional Water Quality Control Boards (tract geography; PUMAs have no board).
+- **Per-tract detail** — click any area for its isolation score and a
+  **population-by-language table (age 5+)**: for each language, the number of
+  speakers, that as a **% of the area's population**, and how many are
+  limited-English — with a population total. Plus limited-English **households**
+  by the four broad language groups.
+- **Download CSV** — exports the current filtered view as one row per area (the
+  CES 5.0 ⋈ ACS join), keyed on `census_tract_geoid` / `puma_geoid` so it joins
+  to any other dataset at that geography. Per language it carries total speakers
+  (`pop5_speakers_*`), their share of population (`pct_pop5_*`), and the
+  limited-English subset (`pop5_lep_*`), plus `population_5plus` and the
+  broad-group limited-English **household** counts (`hh_lep_*`). UTF-8 with BOM
+  for Excel.
 - Bilingual **English / Spanish** UI, colorblind-safe palette.
 
 ## Data sources

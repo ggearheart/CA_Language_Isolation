@@ -14,6 +14,7 @@
   --ap:#D55E00;   /* Asian & Pacific Is.*/
   --ot:#009E73;   /* Other languages    */
   --nodata:#c9ced6;
+  --danger:#B91C1C;
   --ca-blue:#003368; --ca-gold:#FDB913;
   --bg:#F0F4F8; --white:#fff; --text:#1a2332; --sub:#4B5563; --border:#d0d8e4;
   --radius:8px;
@@ -54,6 +55,17 @@ select.filter{cursor:pointer;}
 .geo-note{display:none;font-size:.7rem;color:var(--sub);line-height:1.45;margin:-3px 0 9px;
   padding:6px 8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;}
 .geo-note.on{display:block;}
+#rb-wrap{margin-bottom:2px;}
+.rb-btns{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;}
+.rb-btn{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid var(--border);
+  border-radius:20px;background:var(--bg);cursor:pointer;font-size:.71rem;font-weight:600;color:var(--text);line-height:1.1;}
+.rb-btn:hover{background:#e6edf6;}
+.rb-btn.active{background:var(--ca-blue);border-color:var(--ca-blue);color:#fff;}
+.rb-btn .rb-n{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
+  border-radius:50%;background:var(--ca-blue);color:#fff;font-size:.6rem;font-weight:800;flex-shrink:0;}
+.rb-btn.active .rb-n{background:#fff;color:var(--ca-blue);}
+.rb-btn.rb-all{font-weight:700;}
+.rb-btn.rb-all .rb-n{display:none;}
 #langchip{display:none;}
 #langchip.on{display:flex;align-items:center;gap:7px;background:#EFF3F9;border:1px solid var(--border);
   border-left:3px solid var(--ca-gold);border-radius:6px;padding:6px 9px;margin:0 0 8px;font-size:.75rem;}
@@ -97,6 +109,18 @@ select.filter{cursor:pointer;}
 .bar-fill{height:100%;border-radius:3px 0 0 3px;}
 .bar-val{width:38px;text-align:right;flex-shrink:0;color:var(--sub);font-weight:600;font-size:.68rem;}
 .d-sub{font-size:.66rem;color:var(--sub);margin:11px 0 5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+.lang-table{width:100%;border-collapse:collapse;font-size:.72rem;}
+.lang-table th{font-size:.6rem;text-transform:uppercase;letter-spacing:.03em;color:var(--sub);
+  font-weight:700;text-align:right;padding:2px 0 4px;border-bottom:1px solid var(--border);}
+.lang-table th:first-child{text-align:left;}
+.lang-table td{padding:3px 0;border-bottom:1px solid #eef2f7;vertical-align:top;}
+.lang-table td.lt-name{text-align:left;padding-right:6px;line-height:1.2;}
+.lang-table td.lt-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:7px;}
+.lang-table td.lt-pct{text-align:right;font-variant-numeric:tabular-nums;color:var(--sub);padding-left:7px;}
+.lang-table tr.lt-total td{border-top:2px solid var(--border);border-bottom:none;
+  font-weight:800;color:var(--text);padding-top:5px;}
+.lang-table tr.lt-total td.lt-pct{color:var(--sub);font-weight:700;}
+.lang-table .lt-eng{color:var(--danger);}
 .d-note{font-size:.66rem;color:var(--sub);line-height:1.45;margin-top:9px;font-style:italic;}
 .hint{font-size:.72rem;color:var(--sub);text-align:center;padding:16px 8px;line-height:1.5;}
 .sources{font-size:.63rem;color:var(--sub);line-height:1.5;padding:10px 13px;border-top:1px solid var(--border);background:#fafbfc;}
@@ -162,6 +186,11 @@ select.filter{cursor:pointer;}
       <div class="sb-label" id="h_county">County</div>
       <select class="filter" id="county"><option value="">All California</option></select>
 
+      <div id="rb-wrap">
+        <div class="sb-label" id="h_rb">Regional Water Board</div>
+        <div class="rb-btns" id="rb-btns"></div>
+      </div>
+
       <div class="sb-label" id="h_langsearch">Search by language</div>
       <select class="filter" id="langsearch"><option value="">All languages</option></select>
       <div id="langchip"></div>
@@ -189,10 +218,10 @@ select.filter{cursor:pointer;}
           <div class="stat-card"><div class="stat-num" id="d-pct"></div><div class="stat-lbl" id="d-pctl">Isolation percentile</div></div>
           <div class="stat-card"><div class="stat-num" id="d-lg"></div><div class="stat-lbl" id="d-lgl">% isolated HH</div></div>
         </div>
-        <div class="d-sub" id="d-grph">Isolated households by language group</div>
+        <div class="d-sub" id="d-langh">Population by language (age 5+)</div>
+        <table class="lang-table" id="d-langtable"></table>
+        <div class="d-sub" id="d-grph">Limited-English households by group</div>
         <div id="d-groups"></div>
-        <div class="d-sub" id="d-langh">Languages isolated for (residents 5+)</div>
-        <div id="d-langs"></div>
         <div class="d-note" id="d-note"></div>
       </div>
       <div class="hint" id="hint">👆 Click a tract on the map to see its linguistic isolation score and language breakdown.</div>
@@ -229,7 +258,8 @@ const T={
       stl_tracts:'Tracts shown',stl_lep:'Isolated households',stl_high:'High-isolation tracts',
       hint:'👆 Click a tract on the map to see its linguistic isolation score and language breakdown.',
       d_pctl:'Isolation percentile',d_lgl:'% isolated HH',
-      d_grph:'Isolated households by language group',d_langh:'Languages isolated for (residents 5+)',
+      d_grph:'Limited-English households by group',d_langh:'Population by language (age 5+)',
+      lt_language:'Language',lt_speakers:'Speakers',lt_pct:'% pop',lt_eng:'Ltd. English',lt_totalPop:'Population 5+',
       src_h:'Data sources',
       src_ces:'Linguistic isolation: CalEnviroScreen 5.0 (draft, OEHHA), census-tract level.',
       src_acs:'Languages: U.S. Census ACS 2020–2024 5-year (tables C16002 & C16001).',
@@ -240,6 +270,7 @@ const T={
       geoUnsupported:'Location is not available on this device.',geoOutside:'You appear to be outside California.',
       note:'A "limited-English-speaking household" is one where no one age 14+ speaks English "very well" — the Census definition of linguistic isolation. Named-language counts are people 5+ who speak English less than "very well"; at the tract level the Census reports 11 language groups.',
       lp_lo:'Least isolated',lp_hi:'Most isolated',pctSuffix:'th percentile',noData:'No data',topGroup:'Top group',
+      h_rb:'Regional Water Board',rbAll:'All boards',
       h_langsearch:'Search by language',allLangs:'All languages',showing:'Showing',
       langCap:'residents isolated (5+)',langNone:'not present',
       langN:{'Spanish':'Spanish','Other Indo-European':'Other Indo-European','Asian & Pacific Island':'Asian & Pacific Island','Other languages':'Other languages',
@@ -258,7 +289,8 @@ const T={
       stl_tracts:'Distritos mostrados',stl_lep:'Hogares aislados',stl_high:'Distritos muy aislados',
       hint:'👆 Haga clic en un distrito para ver su nivel de aislamiento lingüístico y los idiomas.',
       d_pctl:'Percentil de aislamiento',d_lgl:'% hogares aislados',
-      d_grph:'Hogares aislados por grupo de idioma',d_langh:'Idiomas de aislamiento (residentes 5+)',
+      d_grph:'Hogares con inglés limitado por grupo',d_langh:'Población por idioma (5+ años)',
+      lt_language:'Idioma',lt_speakers:'Hablantes',lt_pct:'% pob.',lt_eng:'Inglés ltd.',lt_totalPop:'Población 5+',
       src_h:'Fuentes de datos',
       src_ces:'Aislamiento lingüístico: CalEnviroScreen 5.0 (borrador, OEHHA), por distrito censal.',
       src_acs:'Idiomas: Censo de EE. UU. ACS 2020–2024 5 años (tablas C16002 y C16001).',
@@ -269,6 +301,7 @@ const T={
       geoUnsupported:'La ubicación no está disponible en este dispositivo.',geoOutside:'Parece estar fuera de California.',
       note:'Un "hogar con inglés limitado" es aquel donde nadie de 14+ años habla inglés "muy bien" — la definición censal de aislamiento lingüístico. Los conteos por idioma son personas de 5+ años que hablan inglés menos que "muy bien"; a nivel de distrito el Censo reporta 11 grupos de idiomas.',
       lp_lo:'Menos aislado',lp_hi:'Más aislado',pctSuffix:'° percentil',noData:'Sin datos',topGroup:'Grupo principal',
+      h_rb:'Junta Regional del Agua',rbAll:'Todas',
       h_langsearch:'Buscar por idioma',allLangs:'Todos los idiomas',showing:'Mostrando',
       langCap:'residentes aislados (5+)',langNone:'no presente',
       langN:{'Spanish':'Español','Other Indo-European':'Otras indoeuropeas','Asian & Pacific Island':'Asiáticas y del Pacífico','Other languages':'Otras lenguas',
@@ -284,16 +317,31 @@ const GROUP_COLORS=['var(--sp)','var(--ie)','var(--ap)','var(--ot)'];
 const GROUP_HEX=['#0072B2','#CC79A7','#D55E00','#009E73'];
 let DATA=null, GROUP_LABELS=[], LANG_NAMES=[], metric='lp', layer=null, selected=null;
 let selLang=null;               // index into LANG_NAMES when searching by language
+let selRB=null;                 // regional-board number filter ('1'..'9'), tract geo only
 let shownFeats=[];              // features currently passing all filters (for CSV export)
+// The 9 Regional Water Quality Control Boards (number -> name, EN/ES).
+const BOARDS=[
+  {n:'1',en:'North Coast',es:'Costa Norte'},
+  {n:'2',en:'San Francisco Bay',es:'Bahía de San Francisco'},
+  {n:'3',en:'Central Coast',es:'Costa Central'},
+  {n:'4',en:'Los Angeles',es:'Los Ángeles'},
+  {n:'5',en:'Central Valley',es:'Valle Central'},
+  {n:'6',en:'Lahontan',es:'Lahontan'},
+  {n:'7',en:'Colorado River',es:'Río Colorado'},
+  {n:'8',en:'Santa Ana',es:'Santa Ana'},
+  {n:'9',en:'San Diego',es:'San Diego'},
+];
 let countyBounds={};
 let geo='tract';                // 'tract' | 'puma'
 const DS={};                    // geography -> loaded FeatureCollection (lazy)
 const GEO_FILE={tract:'tracts.json',puma:'pumas.json'};
 
 // residents 5+ isolated for language `idx` in this tract (0 if not present)
-function langCount(p,idx){
+function langEntry(p,idx){ return p.L?p.L.find(e=>e[0]===idx):null; }   // [idx,speakers,lep]
+function langSpeakers(p,idx){ const e=langEntry(p,idx); return e?e[1]:0; }
+function langCount(p,idx){   // limited-English speakers (drives the isolation search/colour)
   if(idx==null||!p.L) return 0;
-  const hit=p.L.find(e=>e[0]===idx); return hit?hit[1]:0;
+  const hit=langEntry(p,idx); return hit?hit[2]:0;
 }
 const LANG_BREAKS=[25,100,300,750];   // person-count class breaks
 function colorLANG(p){
@@ -392,6 +440,7 @@ function buildLayer(){
   const feats=DATA.features.filter(f=>{
     const p=f.properties;
     if(cty && !(p.cs||[p.c]).includes(cty)) return false;        // a PUMA can span several counties
+    if(selRB && p.rb!==selRB) return false;                      // regional board (tract only; PUMAs have no rb)
     if(selLang!=null && langCount(p,selLang)<=0) return false;   // only areas where the language is isolated for
     if(q && !matchesQuery(p,q)) return false;
     return true;
@@ -451,18 +500,19 @@ function selectTract(p){
   document.getElementById('d-pctl').textContent=pctLabel();
   document.getElementById('d-pct').textContent=p.lp==null?'—':Math.round(p.lp);
   document.getElementById('d-lg').textContent=p.lg==null?'—':p.lg+'%';
-  // groups
-  const gTot=(p.g||[]).reduce((a,b)=>a+b,0);
+  // these detail labels have hyphen ids that the setLang loop (underscore keys)
+  // never matched — set them here so they follow the language.
+  document.getElementById('d-lgl').textContent=tr('d_lgl');
+  document.getElementById('d-langh').textContent=tr('d_langh');
+  document.getElementById('d-grph').textContent=tr('d_grph');
+  // population by language (age 5+): speakers, % of pop, limited-English
+  document.getElementById('d-langtable').innerHTML=langTableHTML(p);
+  // limited-English households by broad group
   const gMax=Math.max(1,...(p.g||[0]));
   document.getElementById('d-groups').innerHTML=(p.g||[]).map((v,i)=>{
     if(v<=0) return '';
     return barRow(trLang(GROUP_LABELS[i]),v,gMax,GROUP_COLORS[i],v.toLocaleString());
-  }).join('')||`<div class="d-note">${lang==='en'?'No isolated households reported.':'No se reportan hogares aislados.'}</div>`;
-  // languages
-  const langs=p.L||[]; const lMax=langs.length?langs[0][1]:1;
-  document.getElementById('d-langs').innerHTML=langs.length?langs.map(([idx,c])=>
-    barRow(trLang(LANG_NAMES[idx]),c,lMax,'var(--ca-blue)',c.toLocaleString())).join(''):
-    `<div class="d-note">${lang==='en'?'No named-language detail.':'Sin detalle por idioma.'}</div>`;
+  }).join('')||`<div class="d-note">${lang==='en'?'No limited-English households reported.':'No se reportan hogares con inglés limitado.'}</div>`;
   document.getElementById('d-note').textContent=tr('note')+(isPuma?' '+tr('pumaNote'):'');
   if(window.innerWidth<=760) document.querySelector('.sidebar').classList.add('open');
 }
@@ -471,6 +521,27 @@ function barRow(label,val,max,color,valTxt){
   return `<div class="bar-row"><div class="bar-lbl">${label}</div>`+
     `<div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${color}"></div></div>`+
     `<div class="bar-val">${valTxt}</div></div>`;
+}
+// Population-by-language table: per-language speakers + % of pop 5+ + limited
+// English, with a population total. p.L = [langIdx, speakers, limited_english].
+function langTableHTML(p){
+  const pop=p.pop||0;
+  const langs=(p.L||[]).slice().sort((a,b)=>b[1]-a[1]);   // by speakers desc
+  if(!langs.length) return `<tr><td class="lt-name" colspan="4" style="color:var(--sub);font-style:italic">${lang==='en'?'No language detail.':'Sin detalle por idioma.'}</td></tr>`;
+  const fmtPct=v=> v>=10?Math.round(v)+'%' : v>=1?v.toFixed(1)+'%' : v>0?'<1%':'0%';
+  let totLep=0;
+  const body=langs.map(([idx,tot,lep])=>{
+    totLep+=lep;
+    return `<tr><td class="lt-name">${trLang(LANG_NAMES[idx])}</td>`+
+      `<td class="lt-num">${tot.toLocaleString()}</td>`+
+      `<td class="lt-pct">${pop?fmtPct(tot/pop*100):'—'}</td>`+
+      `<td class="lt-num lt-eng">${lep.toLocaleString()}</td></tr>`;
+  }).join('');
+  const head=`<tr><th>${tr('lt_language')}</th><th>${tr('lt_speakers')}</th><th>${tr('lt_pct')}</th><th>${tr('lt_eng')}</th></tr>`;
+  const total=`<tr class="lt-total"><td class="lt-name">${tr('lt_totalPop')}</td>`+
+    `<td class="lt-num">${pop.toLocaleString()}</td><td class="lt-pct"></td>`+
+    `<td class="lt-num lt-eng">${totLep.toLocaleString()}</td></tr>`;
+  return head+body+total;
 }
 
 // ── legends ──────────────────────────────────────────────────────────────────
@@ -542,6 +613,26 @@ document.getElementById('county').addEventListener('change',e=>{
   const c=e.target.value;
   if(c && countyBounds[c]) map.fitBounds(countyBounds[c],{padding:[20,20]});
   else map.setView([37.3,-119.4],6,{animate:false});
+});
+
+// ── Regional Water Board quick-filter buttons (tract geography) ───────────────
+function buildRBButtons(){
+  const wrap=document.getElementById('rb-btns');
+  const all=`<button class="rb-btn rb-all${selRB?'':' active'}" data-rb="">${tr('rbAll')}</button>`;
+  const btns=BOARDS.map(b=>`<button class="rb-btn${selRB===b.n?' active':''}" data-rb="${b.n}" title="Region ${b.n}">`+
+    `<span class="rb-n">${b.n}</span>${lang==='es'?b.es:b.en}</button>`).join('');
+  wrap.innerHTML=all+btns;
+}
+function applyRB(rb){                 // rb='' or null clears
+  selRB=rb||null;
+  document.querySelectorAll('#rb-btns .rb-btn').forEach(x=>
+    x.classList.toggle('active',(x.dataset.rb||'')===(selRB||'')));
+  buildLayer();
+  if(selRB && DATA._rbb && DATA._rbb[selRB]) map.fitBounds(DATA._rbb[selRB],{padding:[20,20]});
+  else map.setView([37.3,-119.4],6,{animate:false});
+}
+document.getElementById('rb-btns').addEventListener('click',e=>{
+  const b=e.target.closest('.rb-btn'); if(b) applyRB(b.dataset.rb);
 });
 // ── smart search: local fields instantly, address via geocoder on Enter ──────
 const hintEl=()=>document.getElementById('searchhint');
@@ -626,6 +717,7 @@ function csvCell(v){ if(v==null)return''; v=String(v); return /[",\n\r]/.test(v)
 function csvScope(){
   const parts=[];
   if(geo==='puma') parts.push('puma');
+  if(selRB){ const bd=BOARDS.find(b=>b.n===selRB); if(bd) parts.push('region'+bd.n+'_'+slug(bd.en)); }
   const cty=document.getElementById('county').value; if(cty) parts.push(slug(cty));
   if(selLang!=null) parts.push(slug(LANG_NAMES[selLang]));
   const q=document.getElementById('search').value.trim(); if(q) parts.push(slug(q));
@@ -633,30 +725,37 @@ function csvScope(){
 }
 function downloadCSV(){
   const feats=shownFeats||[]; if(!feats.length) return;
-  // hh_lep_* = limited-English HOUSEHOLDS by broad group (ACS C16002)
-  // pop5_lep_* = PERSONS 5+ who speak English < "very well" by named language (ACS C16001)
-  const langCols=LANG_NAMES.map(n=>'pop5_lep_'+slug(n));
+  // hh_lep_*       = limited-English HOUSEHOLDS by broad group (ACS C16002)
+  // pop5_speakers_* = PERSONS 5+ who speak that language at home (ACS C16001)
+  // pct_pop5_*     = pop5_speakers_* as a % of population_5plus
+  // pop5_lep_*     = of those, PERSONS 5+ who speak English < "very well"
   const hhCols=['hh_lep_spanish','hh_lep_other_indo_european','hh_lep_asian_pacific_island','hh_lep_other'];
+  const speakerCols=LANG_NAMES.map(n=>'pop5_speakers_'+slug(n));
+  const pctCols=LANG_NAMES.map(n=>'pct_pop5_'+slug(n));
+  const lepCols=LANG_NAMES.map(n=>'pop5_lep_'+slug(n));
+  const langCols=[...speakerCols,...pctCols,...lepCols];
   const puma=geo==='puma';
   // PUMA rows carry no CalEnviroScreen percentile and no ZIP/city/board —
   // those are tract-level only, so the schema differs by geography.
   const header=puma
     ? ['puma_geoid','puma_name','counties','pct_limited_english_households',
        'acs_isolation_percentile_among_pumas',
-       'total_households','limited_english_households',...hhCols,...langCols]
+       'total_households','limited_english_households','population_5plus',...hhCols,...langCols]
     : ['census_tract_geoid','county','city','zip','regional_board_number','regional_board_name',
        'ling_isolation_pct','ling_isolation_percentile',
-       'total_households','limited_english_households',...hhCols,...langCols];
+       'total_households','limited_english_households','population_5plus',...hhCols,...langCols];
   const rows=[header.join(',')];
   feats.forEach(f=>{
-    const p=f.properties, g=p.g||[0,0,0,0];
-    const lc=LANG_NAMES.map((_,i)=>{const h=(p.L||[]).find(e=>e[0]===i); return h?h[1]:0;});
+    const p=f.properties, g=p.g||[0,0,0,0], pop=p.pop||0;
+    const spk=LANG_NAMES.map((_,i)=>langSpeakers(p,i));
+    const pct=LANG_NAMES.map((_,i)=>pop?+(langSpeakers(p,i)/pop*100).toFixed(1):'');
+    const lep=LANG_NAMES.map((_,i)=>langCount(p,i));
     const base=puma
       ? [p.t,p.nm,p.c,p.lg==null?'':p.lg,p.lp==null?'':p.lp,
-         p.hh==null?'':p.hh,p.lep==null?'':p.lep]
+         p.hh==null?'':p.hh,p.lep==null?'':p.lep,pop]
       : [p.t,p.c,p.ci,p.z,p.rb,p.rbn,p.lg==null?'':p.lg,p.lp==null?'':p.lp,
-         p.hh==null?'':p.hh,p.lep==null?'':p.lep];
-    rows.push([...base,g[0],g[1],g[2],g[3],...lc].map(csvCell).join(','));
+         p.hh==null?'':p.hh,p.lep==null?'':p.lep,pop];
+    rows.push([...base,g[0],g[1],g[2],g[3],...spk,...pct,...lep].map(csvCell).join(','));
   });
   const csv='﻿'+rows.join('\r\n');            // UTF-8 BOM so Excel reads it cleanly
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
@@ -671,7 +770,7 @@ function setLang(l,btn){
   lang=l;
   document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['h_title','h_sub','h_intro','h_geo','g_tract','g_puma','h_metric','h_county','h_langsearch',
+  ['h_title','h_sub','h_intro','h_geo','g_tract','g_puma','h_metric','h_county','h_rb','h_langsearch',
    'h_find','h_nearme','h_legend','h_menu',
    'm_lp','m_lg','m_grp','stl_tracts','stl_lep','stl_high','hint','h_dlcsv',
    'd_pctl','d_lgl','d_grph','d_langh','src_h','src_ces','src_acs'].forEach(id=>{
@@ -679,7 +778,7 @@ function setLang(l,btn){
   });
   document.getElementById('search').placeholder=tr('search');
   const opt0=document.querySelector('#county option[value=""]'); if(opt0) opt0.textContent=tr('allCA');
-  populateLangSelect(); renderLangChip();
+  populateLangSelect(); renderLangChip(); buildRBButtons();
   const gn=document.getElementById('geonote');
   if(geo==='puma') gn.innerHTML=tr('pumaNoteBox');
   updateMetricAvailability();
@@ -692,7 +791,7 @@ function setLang(l,btn){
 // One pass per dataset: cache feature bboxes and build county bounds.
 // A PUMA can span several counties (p.cs), a tract has exactly one (p.c).
 function prepDataset(d){
-  const cb={};
+  const cb={}, rbb={};
   d.features.forEach(f=>{
     const b=featBBox(f.geometry); f._bb=b;
     const lb=L.latLngBounds([[b[1],b[0]],[b[3],b[2]]]);
@@ -701,8 +800,13 @@ function prepDataset(d){
       if(!cb[c]) cb[c]=L.latLngBounds(lb.getSouthWest(),lb.getNorthEast());
       else cb[c].extend(lb);
     });
+    const rb=f.properties.rb;   // regional board (tract datasets only)
+    if(rb){
+      if(!rbb[rb]) rbb[rb]=L.latLngBounds(lb.getSouthWest(),lb.getNorthEast());
+      else rbb[rb].extend(lb);
+    }
   });
-  d._cb=cb;
+  d._cb=cb; d._rbb=rbb;
   return d;
 }
 function activateGeo(g,anchor){
@@ -721,6 +825,12 @@ function activateGeo(g,anchor){
   sel.value=cur;
   if(selLang!=null && selLang>=LANG_NAMES.length) selLang=null;
   populateLangSelect(); renderLangChip();
+  // Regional Water Board is a tract-level attribute — PUMAs have no board, so
+  // hide the buttons and drop any board filter when switching to PUMA.
+  const hasRB=Object.keys(DATA._rbb||{}).length>0;
+  document.getElementById('rb-wrap').style.display=hasRB?'':'none';
+  if(!hasRB) selRB=null;
+  buildRBButtons();
   selected=null;
   document.getElementById('detail').classList.remove('on');
   document.getElementById('hint').style.display='';

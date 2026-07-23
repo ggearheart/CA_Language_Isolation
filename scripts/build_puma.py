@@ -92,11 +92,12 @@ def main():
             hh, lep = a["total_hh"], a["lep_hh"]
             props["hh"] = hh
             props["lep"] = lep
+            props["pop"] = a.get("pop", 0)     # population age 5+
             props["lg"] = round(lep / hh * 100, 1) if hh else None
             props["g"] = [a["groups"].get(k, 0) for k in GROUP_ORDER]
-            langs = [(n, c) for n, c in a["langs"]
-                     if not n.lower().startswith("other and unspecified")]
-            props["L"] = [[idx(n), c] for n, c in langs]
+            langs = [row for row in a["langs"]
+                     if not row[0].lower().startswith("other and unspecified")]
+            props["L"] = [[idx(n), tot, lep] for n, tot, lep in langs]
         f["properties"] = props
         feats.append(f)
 

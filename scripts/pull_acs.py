@@ -91,33 +91,40 @@ def main():
     if not KEY:
         sys.exit("Set CENSUS_KEY env var")
 
-    # --- language-name map for C16001 "less than very well" variables ---
+    # --- C16001 variable map: per language, the total-speakers var AND the
+    #     "speak English less than very well" var; plus the pop-5+ denominator.
+    # Labels: Estimate!!Total:                                    -> pop 5+
+    #         Estimate!!Total:!!<Language>:                       -> total speakers
+    #         Estimate!!Total:!!<Language>:!!Speak English less..  -> limited-English
     meta = fetch_json(VARS_URL)["variables"]
-    named = {}  # varcode -> language name
+    POP = "C16001_001E"
+    lang_total, lang_lep = {}, {}   # varcode -> language name
     for code, info in meta.items():
         if not code.startswith("C16001_"):
             continue
-        label = info.get("label", "")
-        if 'less than "very well"' not in label:
-            continue
-        # label: Estimate!!Total:!!<Language>:!!Speak English less than "very well"
-        parts = label.split("!!")
-        lang = parts[2].rstrip(":").strip()
-        named[code] = lang
-    print(f"C16001 named languages: {len(named)}", file=sys.stderr)
+        parts = info.get("label", "").split("!!")
+        if len(parts) == 3 and parts[2].endswith(":"):
+            lang_total[code] = parts[2].rstrip(":").strip()
+        elif len(parts) == 4 and 'less than "very well"' in parts[3]:
+            lang_lep[code] = parts[2].rstrip(":").strip()
+    # order languages by the total-var code so total/lep stay aligned
+    names = [lang_total[c] for c in sorted(lang_total)]
+    total_by_name = {v: k for k, v in lang_total.items()}
+    lep_by_name = {v: k for k, v in lang_lep.items()}
+    print(f"C16001 named languages: {len(names)}", file=sys.stderr)
 
     # --- pull C16002 (broad household groups) ---
     c_rows = api(list(C16002.keys()))
     c_data = rows_to_dict(c_rows)
     print(f"C16002 tracts: {len(c_data)}", file=sys.stderr)
 
-    # --- pull C16001 (named languages, less-than-very-well) ---
-    b_codes = list(named.keys())
+    # --- pull C16001 (pop 5+, per-language total speakers + limited-English) ---
+    b_codes = [POP] + [total_by_name[n] for n in names] + [lep_by_name[n] for n in names]
     b_rows = api(b_codes)
     b_data = rows_to_dict(b_rows)
     print(f"C16001 tracts: {len(b_data)}", file=sys.stderr)
 
-    # --- merge per tract ---
+    # --- merge per area ---
     result = {}
     geoids = set(c_data) | set(b_data)
     for g in geoids:
@@ -127,18 +134,21 @@ def main():
         lep_hh = sum(groups.values())
 
         b = b_data.get(g, {})
+        pop = num(b.get(POP))                 # population 5+ (language-% denominator)
         langs = []
-        for code, name in named.items():
-            v = num(b.get(code))
-            if v > 0:
-                langs.append([name, v])
-        langs.sort(key=lambda x: -x[1])
+        for name in names:
+            tot = num(b.get(total_by_name[name]))
+            lep = num(b.get(lep_by_name[name]))
+            if tot > 0:
+                langs.append([name, tot, lep])   # total speakers, limited-English
+        langs.sort(key=lambda x: -x[1])           # by total speakers desc
 
         result[g] = {
             "total_hh": total_hh,
             "lep_hh": lep_hh,
             "groups": groups,            # broad household LEP counts
-            "langs": langs,              # [ [name, persons], ... ] desc, person-level
+            "pop": pop,                  # population age 5+
+            "langs": langs,              # [ [name, speakers, limited_english], ... ]
         }
 
     with open(OUT, "w") as f:

@@ -13,8 +13,9 @@ Property schema per feature:
   lg  % limited-English-speaking households (1 dp)     <- CES ling
   hh  total households (ACS)
   lep limited-English-speaking households (ACS)
+  pop population age 5+ (ACS C16001 base — denominator for language %)
   g   [spanish, other_indo_euro, asian_pi, other]  broad LEP-household counts
-  L   [[langIdx, persons], ...]  named langs (pop 5+, English < "very well"), desc
+  L   [[langIdx, speakers, limited_english], ...]  named langs, by speakers desc
 Top-level:
   langNames   index -> language name (for L)
   groupLabels ordered labels for g
@@ -77,13 +78,15 @@ def main():
             matched += 1
             props["hh"] = a["total_hh"]
             props["lep"] = a["lep_hh"]
+            props["pop"] = a.get("pop", 0)     # population age 5+ (language-% base)
             props["g"] = [a["groups"].get(k, 0) for k in GROUP_ORDER]
             # drop the catch-all "Other and unspecified" from the named list so
             # the popup highlights actual named languages; keep all remaining
             # groups (max ~10) so language search is exact, not top-N truncated
-            langs = [(n, c) for n, c in a["langs"]
-                     if not n.lower().startswith("other and unspecified")]
-            props["L"] = [[idx(n), c] for n, c in langs]
+            # L = [langIdx, total_speakers, limited_english_speakers]
+            langs = [row for row in a["langs"]
+                     if not row[0].lower().startswith("other and unspecified")]
+            props["L"] = [[idx(n), tot, lep] for n, tot, lep in langs]
         f["properties"] = props
         kept.append(f)
 
